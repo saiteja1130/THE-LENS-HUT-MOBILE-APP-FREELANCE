@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
-  Alert,
   StatusBar,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -16,6 +15,7 @@ import LAYOUT from '../../constants/layout';
 import ScreenHeader from '../../components/common/ScreenHeader';
 import Button from '../../components/common/Button';
 import useAuthStore from '../../store/authStore';
+import useFeedbackStore from '../../store/feedbackStore';
 
 const REASONS = [
   'I am not using the application anymore',
@@ -32,6 +32,8 @@ export const DeleteAccountScreen = ({ navigation }) => {
 
   const deleteAccount = useAuthStore((state) => state.deleteAccount);
   const user = useAuthStore((state) => state.user);
+  const showSuccess = useFeedbackStore((state) => state.showSuccess);
+  const showError = useFeedbackStore((state) => state.showError);
 
   const handleConfirmDelete = async () => {
     setIsDeleting(true);
@@ -40,14 +42,14 @@ export const DeleteAccountScreen = ({ navigation }) => {
       setIsDeleting(false);
       setIsConfirmModalVisible(false);
 
-      Alert.alert(
+      showSuccess(
         'Account Deleted',
         'Your profile, stored vision prescriptions, and device session have been permanently deleted.',
-        [{ text: 'OK', onPress: () => navigation.replace('Splash') }]
+        () => navigation.replace('Splash')
       );
     } catch (e) {
       setIsDeleting(false);
-      Alert.alert('Error', 'Unable to delete account at this time. Please try again.');
+      showError('Error', 'Unable to delete account at this time. Please try again.');
     }
   };
 

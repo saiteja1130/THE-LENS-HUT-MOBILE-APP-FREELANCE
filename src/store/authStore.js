@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { storage, STORAGE_KEYS } from '../utils/storage';
+import { authApi } from '../services/authApi';
 
 export const useAuthStore = create((set, get) => ({
   user: null,
@@ -22,6 +23,7 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
+  // Direct login state setter
   login: async (userData, token) => {
     try {
       await storage.set(STORAGE_KEYS.AUTH_TOKEN, token);
@@ -32,6 +34,60 @@ export const useAuthStore = create((set, get) => ({
       console.error('Login error:', e);
       return false;
     }
+  },
+
+  // Password Login via Backend API
+  loginWithPassword: async (email, password) => {
+    const res = await authApi.loginWithPassword({ email, password });
+    if (res.success && res.data) {
+      const { token, user } = res.data;
+      await storage.set(STORAGE_KEYS.AUTH_TOKEN, token);
+      await storage.set(STORAGE_KEYS.USER, user);
+      set({ user, token, isAuthenticated: true });
+      return { success: true, user };
+    }
+    return res;
+  },
+
+  // Request Login OTP
+  requestLoginOTP: async (email) => {
+    return await authApi.requestLoginOTP({ email });
+  },
+
+  // Verify Login OTP
+  verifyLoginOTP: async (email, otp) => {
+    const res = await authApi.verifyLoginOTP({ email, otp });
+    if (res.success && res.data) {
+      const { token, user } = res.data;
+      await storage.set(STORAGE_KEYS.AUTH_TOKEN, token);
+      await storage.set(STORAGE_KEYS.USER, user);
+      set({ user, token, isAuthenticated: true });
+      return { success: true, user };
+    }
+    return res;
+  },
+
+  // Signup
+  signup: async (data) => {
+    return await authApi.signup(data);
+  },
+
+  // Verify Email OTP
+  verifyEmail: async (email, otp) => {
+    const res = await authApi.verifyEmail({ email, otp });
+    if (res.success && res.data) {
+      const { token, user } = res.data;
+      await storage.set(STORAGE_KEYS.AUTH_TOKEN, token);
+      await storage.set(STORAGE_KEYS.USER, user);
+      set({ user, token, isAuthenticated: true });
+      return { success: true, user };
+    }
+    return res;
+  },
+
+  // Resend Email Verification OTP
+  resendVerification: async (email) => {
+    return await authApi.resendVerificationOTP({ email });
   },
 
   logout: async () => {

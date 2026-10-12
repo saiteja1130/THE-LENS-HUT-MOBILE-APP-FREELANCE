@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import COLORS from '../../constants/colors';
@@ -16,6 +15,7 @@ import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import BrandLogo from '../../components/common/BrandLogo';
 import useAuthStore from '../../store/authStore';
+import useFeedbackStore from '../../store/feedbackStore';
 
 export const RegisterScreen = ({ navigation }) => {
   const [fullName, setFullName] = useState('');
@@ -26,7 +26,9 @@ export const RegisterScreen = ({ navigation }) => {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
-  const login = useAuthStore((state) => state.login);
+  const signup = useAuthStore((state) => state.signup);
+  const showSuccess = useFeedbackStore((state) => state.showSuccess);
+  const showError = useFeedbackStore((state) => state.showError);
 
   const validate = () => {
     const errs = {};
@@ -63,24 +65,30 @@ export const RegisterScreen = ({ navigation }) => {
 
     setIsLoading(true);
     try {
-      const newUser = {
-        id: `usr-${Date.now()}`,
-        name: fullName.trim(),
+      const res = await signup({
+        fullName: fullName.trim(),
         email: email.trim(),
         phone: phone.trim(),
-      };
-      const token = 'jwt-token-new-account';
-
-      await login(newUser, token);
+        password,
+        confirmPassword,
+      });
       setIsLoading(false);
-      Alert.alert(
-        'Account Created',
-        'Welcome to The Lens Hut! Your account has been registered successfully.',
-        [{ text: 'Continue', onPress: () => navigation.replace('Main') }]
-      );
+
+      if (res.success) {
+        showSuccess(
+          'Verification Code Sent',
+          'Please enter the 6-digit code sent to your email to verify your account.',
+          () => navigation.navigate('VerifyEmail', { email: email.trim() })
+        );
+      } else {
+        if (res.errors) {
+          setErrors(res.errors);
+        }
+        showError('Registration Failed', res.message || 'Could not create account. Please check errors.');
+      }
     } catch (e) {
       setIsLoading(false);
-      Alert.alert('Registration Failed', 'Could not create account. Please try again.');
+      showError('Registration Failed', 'Network error. Could not connect to server.');
     }
   };
 

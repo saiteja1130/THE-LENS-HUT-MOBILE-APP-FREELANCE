@@ -5,7 +5,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   StatusBar,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -15,9 +14,12 @@ import ScreenHeader from '../../components/common/ScreenHeader';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import useAuthStore from '../../store/authStore';
+import useFeedbackStore from '../../store/feedbackStore';
 
 export const EditProfileScreen = ({ navigation }) => {
   const { user, updateProfile } = useAuthStore();
+  const showSuccess = useFeedbackStore((state) => state.showSuccess);
+  const showError = useFeedbackStore((state) => state.showError);
 
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
@@ -50,11 +52,13 @@ export const EditProfileScreen = ({ navigation }) => {
     setIsLoading(false);
 
     if (success) {
-      Alert.alert('Profile Updated', 'Your profile details have been successfully saved.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      showSuccess(
+        'Profile Updated',
+        'Your profile details have been successfully saved.',
+        () => navigation.goBack()
+      );
     } else {
-      Alert.alert('Error', 'Failed to update profile.');
+      showError('Error', 'Failed to update profile.');
     }
   };
 

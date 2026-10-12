@@ -25,18 +25,57 @@ export function normalizeProduct(product) {
   let variants = product.variants;
   if (!variants || variants.length === 0) {
     if (product.colors && product.colors.length > 0) {
-      variants = product.colors.map((col, idx) => ({
-        id: `var-${product.id}-${col.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
-        colorName: col.name,
-        colorCode: col.hex,
-        sku: `${(product.sku || product.id).toUpperCase()}-${col.name.slice(0, 3).toUpperCase()}`,
-        price: product.price,
-        compareAtPrice: product.mrp,
-        stock: product.inStock ? 25 : 0,
-        images: [col.image || product.primaryImage, ...(product.galleryImages || [])],
-        isDefault: idx === 0
-      }));
+      variants = product.colors.map((col, idx) => {
+        const perspectiveList =
+          col.images && typeof col.images === 'object' && !Array.isArray(col.images)
+            ? [col.images.front, col.images.side, col.images.angle].filter(Boolean)
+            : Array.isArray(col.images) && col.images.length > 0
+            ? col.images
+            : col.image
+            ? [col.image]
+            : [];
+
+        const frontImg =
+          col.images?.front ||
+          (Array.isArray(col.images) ? col.images[0] : null) ||
+          col.image ||
+          product.primaryImage;
+
+        const allImages =
+          perspectiveList.length > 0
+            ? perspectiveList
+            : frontImg
+            ? [frontImg]
+            : [];
+
+        return {
+          id: `var-${product.id}-${col.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+          colorName: col.name,
+          colorCode: col.hex,
+          images:
+            col.images && typeof col.images === 'object' && !Array.isArray(col.images)
+              ? col.images
+              : { front: frontImg, side: '', angle: '' },
+          image: frontImg,
+          perspectiveList: allImages,
+          imageList: allImages,
+          sku: `${(product.sku || product.id).toUpperCase()}-${col.name.slice(0, 3).toUpperCase()}`,
+          price: product.price,
+          compareAtPrice: product.mrp,
+          stock: product.inStock ? 25 : 0,
+          isDefault: idx === 0,
+        };
+      });
     } else {
+      const defaultProdImages =
+        product.images && typeof product.images === 'object' && !Array.isArray(product.images)
+          ? [product.images.front, product.images.side, product.images.angle].filter(Boolean)
+          : Array.isArray(product.images)
+          ? product.images.filter(Boolean)
+          : product.primaryImage
+          ? [product.primaryImage]
+          : [];
+
       variants = [{
         id: `var-${product.id}-default`,
         colorName: 'Standard',
@@ -45,7 +84,7 @@ export function normalizeProduct(product) {
         price: product.price,
         compareAtPrice: product.mrp,
         stock: product.inStock ? 25 : 0,
-        images: [product.primaryImage, ...(product.galleryImages || [])],
+        images: defaultProdImages,
         isDefault: true
       }];
     }

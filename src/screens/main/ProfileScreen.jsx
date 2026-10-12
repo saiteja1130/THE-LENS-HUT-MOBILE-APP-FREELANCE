@@ -14,21 +14,24 @@ import { FONTS } from '../../constants/fonts';
 import LAYOUT from '../../constants/layout';
 import ScreenHeader from '../../components/common/ScreenHeader';
 import useAuthStore from '../../store/authStore';
+import useFeedbackStore from '../../store/feedbackStore';
 
 export const ProfileScreen = ({ navigation }) => {
   const { user, isAuthenticated, logout } = useAuthStore();
+  const showConfirm = useFeedbackStore((state) => state.showConfirm);
+  const showToast = useFeedbackStore((state) => state.showToast);
 
   const handleLogout = () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign Out',
-        style: 'destructive',
-        onPress: async () => {
-          await logout();
-        },
+    showConfirm({
+      title: 'Sign Out',
+      message: 'Are you sure you want to sign out of your account?',
+      confirmText: 'Sign Out',
+      destructive: true,
+      onConfirm: async () => {
+        await logout();
+        showToast('Signed out successfully', 'info');
       },
-    ]);
+    });
   };
 
   const renderMenuItem = ({ icon, title, subtitle, onPress, isDanger = false, rightElement = null }) => {

@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   StatusBar,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -18,6 +17,7 @@ import LAYOUT from '../../constants/layout';
 import Button from '../../components/common/Button';
 import ScreenHeader from '../../components/common/ScreenHeader';
 import useCartStore from '../../store/cartStore';
+import useFeedbackStore from '../../store/feedbackStore';
 
 export const PowerPrescriptionScreen = ({ route, navigation }) => {
   const { product, selectedColor, selectedLens } = route.params;
@@ -39,6 +39,7 @@ export const PowerPrescriptionScreen = ({ route, navigation }) => {
   const [doctorNotes, setDoctorNotes] = useState('');
 
   const addItem = useCartStore((state) => state.addItem);
+  const showConfirm = useFeedbackStore((state) => state.showConfirm);
 
   const handleConfirm = async () => {
     const prescriptionData = {
@@ -56,14 +57,14 @@ export const PowerPrescriptionScreen = ({ route, navigation }) => {
       quantity: 1,
     });
 
-    Alert.alert(
-      'Customized Eyewear Added',
-      'Your frame and lens prescription have been saved to your shopping bag.',
-      [
-        { text: 'Keep Shopping', onPress: () => navigation.navigate('HomeTab') },
-        { text: 'Go to Bag', onPress: () => navigation.navigate('CartTab') },
-      ]
-    );
+    showConfirm({
+      type: 'success',
+      title: 'Customized Eyewear Added',
+      message: 'Your frame and lens prescription have been saved to your shopping bag.',
+      confirmText: 'Go to Bag',
+      cancelText: 'Keep Shopping',
+      onConfirm: () => navigation.navigate('CartTab'),
+    });
   };
 
   const renderEyeInputRow = (label, sph, setSph, cyl, setCyl, axis, setAxis, add, setAdd) => (

@@ -6,18 +6,19 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import COLORS from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
+import useFeedbackStore from '../../store/feedbackStore';
 
 export const ForgotPasswordScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const showSuccess = useFeedbackStore((state) => state.showSuccess);
 
   const handleSend = () => {
     if (!email.trim() || !/\S+@\S+\.\S+/.test(email.trim())) {
@@ -28,15 +29,10 @@ export const ForgotPasswordScreen = ({ navigation }) => {
     setIsLoading(true);
     setTimeout(() => {
       setIsLoading(false);
-      Alert.alert(
+      showSuccess(
         'Code Sent',
         `A 6-digit recovery code has been sent to ${email.trim()}`,
-        [
-          {
-            text: 'Enter Code',
-            onPress: () => navigation.navigate('ResetPassword', { email: email.trim() }),
-          },
-        ]
+        () => navigation.navigate('ResetPassword', { email: email.trim() })
       );
     }, 1000);
   };

@@ -17,7 +17,6 @@ import formatDate from '../../utils/formatDate';
 import ScreenHeader from '../../components/common/ScreenHeader';
 import Badge from '../../components/common/Badge';
 import EmptyState from '../../components/common/EmptyState';
-import { MOCK_ORDERS } from '../../data/mockData';
 import { storage } from '../../utils/storage';
 
 export const OrderHistoryScreen = ({ navigation }) => {
@@ -28,13 +27,13 @@ export const OrderHistoryScreen = ({ navigation }) => {
     const loadOrders = async () => {
       try {
         const savedOrders = await storage.get('tlh_orders');
-        if (Array.isArray(savedOrders) && savedOrders.length > 0) {
+        if (Array.isArray(savedOrders)) {
           setOrders(savedOrders);
         } else {
-          setOrders(MOCK_ORDERS);
+          setOrders([]);
         }
       } catch (e) {
-        setOrders(MOCK_ORDERS);
+        setOrders([]);
       } finally {
         setIsLoading(false);
       }

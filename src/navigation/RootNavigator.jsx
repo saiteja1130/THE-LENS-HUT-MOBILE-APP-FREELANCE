@@ -10,6 +10,7 @@ import SplashScreen from '../screens/auth/SplashScreen';
 import OnboardingScreen from '../screens/auth/OnboardingScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
+import VerifyEmailScreen from '../screens/auth/VerifyEmailScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
 import BottomTabNavigator from './BottomTabNavigator';
@@ -30,10 +31,33 @@ import TermsAndConditionsScreen from '../screens/profile/TermsAndConditionsScree
 const Stack = createNativeStackNavigator();
 
 export const RootNavigator = () => {
+  const [currentRoute, setCurrentRoute] = React.useState('Splash');
+  const navigationRef = React.useRef(null);
+
+  const updateRoute = () => {
+    const route = navigationRef.current?.getCurrentRoute();
+    if (route?.name && route.name !== currentRoute) {
+      setCurrentRoute(route.name);
+    }
+  };
+
+  const isOnboarding = currentRoute === 'Onboarding';
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.surface} />
-      <NavigationContainer>
+    <SafeAreaView
+      style={styles.safeArea}
+      edges={isOnboarding ? [] : ['top']}
+    >
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={isOnboarding ? 'transparent' : COLORS.surface}
+        translucent={isOnboarding}
+      />
+      <NavigationContainer
+        ref={navigationRef}
+        onReady={updateRoute}
+        onStateChange={updateRoute}
+      >
         <Stack.Navigator
           initialRouteName="Splash"
           screenOptions={{
@@ -48,6 +72,7 @@ export const RootNavigator = () => {
           {/* Authentication */}
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
           <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
 

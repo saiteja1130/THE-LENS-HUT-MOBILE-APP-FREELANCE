@@ -21,6 +21,7 @@ import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import useCartStore from '../../store/cartStore';
 import useAuthStore from '../../store/authStore';
+import useFeedbackStore from '../../store/feedbackStore';
 import { storage } from '../../utils/storage';
 
 export const CheckoutScreen = ({ navigation }) => {
@@ -31,6 +32,10 @@ export const CheckoutScreen = ({ navigation }) => {
   const discount = useCartStore((state) => state.discount);
   const total = useCartStore((state) => state.getTotal());
   const clearCart = useCartStore((state) => state.clearCart);
+
+  const showWarning = useFeedbackStore((state) => state.showWarning);
+  const showError = useFeedbackStore((state) => state.showError);
+  const showToast = useFeedbackStore((state) => state.showToast);
 
   // Direct Address Form State (NO multiple address management)
   const [fullName, setFullName] = useState(user?.name || '');
@@ -65,12 +70,12 @@ export const CheckoutScreen = ({ navigation }) => {
 
   const handlePlaceOrder = async () => {
     if (!validate()) {
-      Alert.alert('Incomplete Address', 'Please fill in all required delivery address fields.');
+      showWarning('Incomplete Address', 'Please fill in all required delivery address fields to proceed.');
       return;
     }
 
     if (items.length === 0) {
-      Alert.alert('Empty Bag', 'You do not have any items in your bag.');
+      showToast('Your shopping bag is empty', 'info');
       navigation.navigate('HomeTab');
       return;
     }
@@ -113,7 +118,7 @@ export const CheckoutScreen = ({ navigation }) => {
     } catch (e) {
       console.error('Order creation error:', e);
       setIsSubmitting(false);
-      Alert.alert('Order Failed', 'Could not process order. Please try again.');
+      showError('Order Failed', 'Could not process your order. Please check your details and try again.');
     }
   };
 

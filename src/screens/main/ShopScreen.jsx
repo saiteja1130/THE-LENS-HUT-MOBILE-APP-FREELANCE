@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   FlatList,
   Modal,
   StatusBar,
+  RefreshControl,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import COLORS from '../../constants/colors';
@@ -16,7 +17,8 @@ import LAYOUT from '../../constants/layout';
 import ProductCard from '../../components/product/ProductCard';
 import EmptyState from '../../components/common/EmptyState';
 import ScreenHeader from '../../components/common/ScreenHeader';
-import { MOCK_CATEGORIES, MOCK_PRODUCTS } from '../../data/mockData';
+import productApi from '../../services/productApi';
+import categoryApi from '../../services/categoryApi';
 
 const SORT_OPTIONS = [
   { id: 'featured', label: 'Featured & Popular' },
@@ -29,19 +31,49 @@ const SHAPE_OPTIONS = ['All', 'Aviator', 'Square', 'Cat-Eye', 'Round', 'Wayfarer
 
 export const ShopScreen = ({ route, navigation }) => {
   const initialCategory = route?.params?.category || 'all';
+  const [products, setProducts] = useState([]);
+  const [categoriesList, setCategoriesList] = useState([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const [selectedShape, setSelectedShape] = useState('All');
   const [selectedSort, setSelectedSort] = useState('featured');
   const [isSortModalVisible, setIsSortModalVisible] = useState(false);
 
+  const loadData = useCallback(async () => {
+    try {
+      const [prodRes, catRes] = await Promise.all([
+        productApi.getProducts(),
+        categoryApi.getActiveCategories(),
+      ]);
+      if (prodRes.success && Array.isArray(prodRes.data)) {
+        setProducts(prodRes.data);
+      }
+      if (catRes.success && Array.isArray(catRes.data)) {
+        setCategoriesList(catRes.data);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const onRefresh = async () => {
+    setIsRefreshing(true);
+    await loadData();
+    setIsRefreshing(false);
+  };
+
   const categories = useMemo(
-    () => [{ id: 'all', name: 'All Products', slug: 'all' }, ...MOCK_CATEGORIES],
-    []
+    () => [{ id: 'all', name: 'All Products', slug: 'all' }, ...categoriesList],
+    [categoriesList]
   );
 
   const filteredProducts = useMemo(() => {
-    let list = [...MOCK_PRODUCTS];
+    let list = [...products];
 
     // Category filter
     if (selectedCategory && selectedCategory !== 'all') {
@@ -196,6 +228,14 @@ export const ShopScreen = ({ route, navigation }) => {
         numColumns={2}
         contentContainerStyle={styles.productList}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            colors={[COLORS.primary]}
+            tintColor={COLORS.primary}
+          />
+        }
         ListEmptyComponent={
           <EmptyState
             iconName="search-outline"

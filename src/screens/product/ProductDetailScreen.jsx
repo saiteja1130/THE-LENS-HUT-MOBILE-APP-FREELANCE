@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   Dimensions,
   StatusBar,
-  Alert,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import COLORS from '../../constants/colors';
@@ -19,21 +18,94 @@ import Button from '../../components/common/Button';
 import ScreenHeader from '../../components/common/ScreenHeader';
 import useWishlistStore from '../../store/wishlistStore';
 import useCartStore from '../../store/cartStore';
+import useFeedbackStore from '../../store/feedbackStore';
+import productApi from '../../services/productApi';
 
 const { width } = Dimensions.get('window');
 
 export const ProductDetailScreen = ({ route, navigation }) => {
-  const { product } = route.params;
+  const incomingProduct = route.params?.product;
+  const productId = route.params?.productId || incomingProduct?.id;
+  const [product, setProduct] = useState(incomingProduct || null);
+
+  useEffect(() => {
+    if (!product && productId) {
+      productApi.getProductByIdOrSlug(productId).then((res) => {
+        if (res.success && res.data) {
+          setProduct(res.data);
+        }
+      });
+    }
+  }, [product, productId]);
+
+  const getImagesFromColor = (c) => {
+    if (!c) return [];
+    if (c.images && typeof c.images === 'object' && !Array.isArray(c.images)) {
+      return [c.images.front, c.images.side, c.images.angle].filter(Boolean);
+    }
+    if (Array.isArray(c.images) && c.images.length > 0) return c.images;
+    if (c.image) return [c.image];
+    return [];
+  };
+
+  const getProductBaseImages = (prod) => {
+    if (!prod) return [];
+    if (prod.images && typeof prod.images === 'object' && !Array.isArray(prod.images)) {
+      return [prod.images.front, prod.images.side, prod.images.angle].filter(Boolean);
+    }
+    if (Array.isArray(prod.images) && prod.images.length > 0) return prod.images.filter(Boolean);
+    if (prod.image) return [prod.image];
+    return [];
+  };
+
+  const defaultImages = getProductBaseImages(product);
 
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [activeImages, setActiveImages] = useState(defaultImages);
   const [selectedColor, setSelectedColor] = useState(
-    product.colors && product.colors.length > 0 ? product.colors[0].name : 'Default'
+    product?.colors && product.colors.length > 0 ? product.colors[0].name : 'Default'
   );
 
-  const images = product.images && product.images.length > 0 ? product.images : [product.image];
-  const isInWishlist = useWishlistStore((state) => state.isInWishlist(product.id));
+  useEffect(() => {
+    if (!product) return;
+    const updatedImages = getProductBaseImages(product);
+    setActiveImages(updatedImages);
+    if (product.colors && product.colors.length > 0) {
+      const firstColor = product.colors[0];
+      setSelectedColor(firstColor.name);
+      const colorImages = getImagesFromColor(firstColor);
+      if (colorImages.length > 0) {
+        setActiveImages(colorImages);
+      }
+    }
+    setSelectedImageIndex(0);
+  }, [product]);
+
+  const handleColorSelect = (colorObj) => {
+    setSelectedColor(colorObj.name);
+    const colorImages = getImagesFromColor(colorObj);
+    if (colorImages.length > 0) {
+      setActiveImages(colorImages);
+      setSelectedImageIndex(0);
+    }
+  };
+
+  const images = activeImages;
+  const isInWishlist = useWishlistStore((state) => state.isInWishlist(product?.id));
   const toggleWishlist = useWishlistStore((state) => state.toggleWishlist);
   const addItem = useCartStore((state) => state.addItem);
+  const showFeedback = useFeedbackStore((state) => state.showConfirm);
+
+  if (!product) {
+    return (
+      <View style={styles.container}>
+        <ScreenHeader title="Product Details" onBackPress={() => navigation.goBack()} />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ fontFamily: FONTS.medium, color: COLORS.textMuted }}>Product not found</Text>
+        </View>
+      </View>
+    );
+  }
 
   const discountPercent =
     product.mrp && product.mrp > product.price
@@ -68,14 +140,14 @@ export const ProductDetailScreen = ({ route, navigation }) => {
       },
       quantity: 1
     });
-    Alert.alert(
-      'Contact Lenses Added',
-      `${product.name} (1 Box · OD -2.00 / OS -2.00) has been added to your shopping bag.`,
-      [
-        { text: 'Continue Shopping', style: 'cancel' },
-        { text: 'View Bag', onPress: () => navigation.navigate('CartTab') },
-      ]
-    );
+    showConfirm({
+      type: 'success',
+      title: 'Contact Lenses Added',
+      message: `${product.name} (1 Box · OD -2.00 / OS -2.00) has been added to your shopping bag.`,
+      confirmText: 'View Bag',
+      cancelText: 'Continue Shopping',
+      onConfirm: () => navigation.navigate('CartTab'),
+    });
   };
 
   const handleSunglassesAction = async () => {
@@ -89,14 +161,14 @@ export const ProductDetailScreen = ({ route, navigation }) => {
       },
       quantity: 1
     });
-    Alert.alert(
-      'Sunglasses Added',
-      `${product.name} (${selectedColor} · Polarized) has been added to your shopping bag.`,
-      [
-        { text: 'Continue Shopping', style: 'cancel' },
-        { text: 'View Bag', onPress: () => navigation.navigate('CartTab') },
-      ]
-    );
+    showConfirm({
+      type: 'success',
+      title: 'Sunglasses Added',
+      message: `${product.name} (${selectedColor} · Polarized) has been added to your shopping bag.`,
+      confirmText: 'View Bag',
+      cancelText: 'Continue Shopping',
+      onConfirm: () => navigation.navigate('CartTab'),
+    });
   };
 
   const handleDirectAddFrame = async () => {
@@ -106,14 +178,14 @@ export const ProductDetailScreen = ({ route, navigation }) => {
       lensPrice: 0,
       quantity: 1,
     });
-    Alert.alert(
-      'Added to Bag',
-      `${product.name} (${selectedColor}) has been added to your shopping bag.`,
-      [
-        { text: 'Continue Shopping', style: 'cancel' },
-        { text: 'View Bag', onPress: () => navigation.navigate('CartTab') },
-      ]
-    );
+    showConfirm({
+      type: 'success',
+      title: 'Added to Bag',
+      message: `${product.name} (${selectedColor}) has been added to your shopping bag.`,
+      confirmText: 'View Bag',
+      cancelText: 'Continue Shopping',
+      onConfirm: () => navigation.navigate('CartTab'),
+    });
   };
 
   return (
@@ -139,8 +211,8 @@ export const ProductDetailScreen = ({ route, navigation }) => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Main Gallery Image */}
-        <View style={styles.imageGalleryContainer}>
+        {/* Main Product Image */}
+        <View style={styles.imageContainer}>
           <Image
             source={{ uri: images[selectedImageIndex] }}
             style={styles.mainImage}
@@ -211,7 +283,7 @@ export const ProductDetailScreen = ({ route, navigation }) => {
                   return (
                     <TouchableOpacity
                       key={c.name}
-                      onPress={() => setSelectedColor(c.name)}
+                      onPress={() => handleColorSelect(c)}
                       style={[
                         styles.colorSwatchRing,
                         isSelected && styles.selectedColorSwatchRing,
@@ -324,7 +396,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100,
   },
-  imageGalleryContainer: {
+  imageContainer: {
     width: '100%',
     backgroundColor: '#F8F9FA',
     position: 'relative',

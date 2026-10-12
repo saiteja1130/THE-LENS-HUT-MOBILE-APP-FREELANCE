@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Linking,
-  Alert,
   StatusBar,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -16,6 +15,7 @@ import LAYOUT from '../../constants/layout';
 import ScreenHeader from '../../components/common/ScreenHeader';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
+import useFeedbackStore from '../../store/feedbackStore';
 
 export const ContactUsScreen = ({ route }) => {
   const initialOrderId = route?.params?.orderId || '';
@@ -24,6 +24,8 @@ export const ContactUsScreen = ({ route }) => {
   );
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const showWarning = useFeedbackStore((state) => state.showWarning);
+  const showSuccess = useFeedbackStore((state) => state.showSuccess);
 
   const handlePhone = () => {
     Linking.openURL('tel:18001235367');
@@ -35,13 +37,13 @@ export const ContactUsScreen = ({ route }) => {
 
   const handleSendMessage = () => {
     if (!message.trim()) {
-      Alert.alert('Required', 'Please enter your query message.');
+      showWarning('Required', 'Please enter your query message.');
       return;
     }
     setIsSending(true);
     setTimeout(() => {
       setIsSending(false);
-      Alert.alert(
+      showSuccess(
         'Message Received',
         'Thank you for reaching out. Our optical support specialist will get in touch with you shortly.'
       );

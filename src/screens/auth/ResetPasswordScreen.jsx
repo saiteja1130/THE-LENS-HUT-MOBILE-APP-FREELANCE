@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import COLORS from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
+import useFeedbackStore from '../../store/feedbackStore';
 
 export const ResetPasswordScreen = ({ route, navigation }) => {
   const email = route?.params?.email || 'your email';
@@ -21,6 +21,7 @@ export const ResetPasswordScreen = ({ route, navigation }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const showSuccess = useFeedbackStore((state) => state.showSuccess);
 
   const validate = () => {
     const errs = {};
@@ -43,10 +44,10 @@ export const ResetPasswordScreen = ({ route, navigation }) => {
     setIsLoading(true);
     setTimeout(() => {
       setIsLoading(false);
-      Alert.alert(
+      showSuccess(
         'Password Reset Successful',
         'Your password has been updated. You can now log in with your new credentials.',
-        [{ text: 'Sign In', onPress: () => navigation.navigate('Login') }]
+        () => navigation.navigate('Login')
       );
     }, 1000);
   };

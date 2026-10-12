@@ -13,9 +13,17 @@ import LAYOUT from '../../constants/layout';
 import formatCurrency from '../../utils/formatCurrency';
 import useWishlistStore from '../../store/wishlistStore';
 
-export const ProductCard = ({ product, onPress, style }) => {
+  const getProductImage = (p) => {
+    return p?.images?.front || (Array.isArray(p?.images) ? p?.images[0] : null) || p?.image || '';
+  };
+
+  const [activeImage, setActiveImage] = React.useState(getProductImage(product));
   const isInWishlist = useWishlistStore((state) => state.isInWishlist(product.id));
   const toggleWishlist = useWishlistStore((state) => state.toggleWishlist);
+
+  React.useEffect(() => {
+    setActiveImage(getProductImage(product));
+  }, [product]);
 
   const discountPercent =
     product.mrp && product.mrp > product.price
@@ -30,7 +38,7 @@ export const ProductCard = ({ product, onPress, style }) => {
     >
       <View style={styles.imageContainer}>
         <Image
-          source={{ uri: product.image }}
+          source={{ uri: activeImage || product.image }}
           style={styles.image}
           resizeMode="cover"
         />
@@ -62,6 +70,37 @@ export const ProductCard = ({ product, onPress, style }) => {
         <Text style={styles.name} numberOfLines={1}>
           {product.name}
         </Text>
+
+        {/* Color preview dots */}
+        {product.colors && product.colors.length > 1 && (
+          <View style={styles.miniColorsRow}>
+            {product.colors.slice(0, 4).map((c) => {
+              const targetImg =
+                c.images?.front ||
+                (Array.isArray(c.images) ? c.images[0] : null) ||
+                c.image;
+              const isActive = activeImage === targetImg;
+
+              return (
+                <TouchableOpacity
+                  key={c.name}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    if (targetImg) setActiveImage(targetImg);
+                  }}
+                  style={[
+                    styles.miniColorDot,
+                    { backgroundColor: c.hex },
+                    isActive && styles.activeMiniColorDot,
+                  ]}
+                />
+              );
+            })}
+            {product.colors.length > 4 && (
+              <Text style={styles.extraColorsCount}>+{product.colors.length - 4}</Text>
+            )}
+          </View>
+        )}
 
         <View style={styles.metaRow}>
           <View style={styles.priceRow}>
@@ -180,6 +219,30 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.secondary,
     marginLeft: 3,
+  },
+  miniColorsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 6,
+  },
+  miniColorDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  activeMiniColorDot: {
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+    transform: [{ scale: 1.15 }],
+  },
+  extraColorsCount: {
+    fontSize: 9,
+    fontFamily: FONTS.medium,
+    color: COLORS.textMuted,
+    marginLeft: 2,
   },
 });
 

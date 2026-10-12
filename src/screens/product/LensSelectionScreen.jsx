@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Image,
   StatusBar,
-  Alert,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import COLORS from '../../constants/colors';
@@ -15,15 +14,16 @@ import { FONTS } from '../../constants/fonts';
 import LAYOUT from '../../constants/layout';
 import formatCurrency from '../../utils/formatCurrency';
 import Button from '../../components/common/Button';
-import ScreenHeader from '../../components/common/ScreenHeader';
-import { LENS_PACKAGES } from '../../data/mockData';
+import { LENS_PACKAGES } from '../../constants/lensPackages';
 import useCartStore from '../../store/cartStore';
+import useFeedbackStore from '../../store/feedbackStore';
 
 export const LensSelectionScreen = ({ route, navigation }) => {
   const { product, selectedColor } = route.params;
   const [selectedLens, setSelectedLens] = useState(LENS_PACKAGES[0]);
 
   const addItem = useCartStore((state) => state.addItem);
+  const showConfirm = useFeedbackStore((state) => state.showConfirm);
 
   const totalAmount = product.price + selectedLens.price;
 
@@ -37,14 +37,14 @@ export const LensSelectionScreen = ({ route, navigation }) => {
         quantity: 1,
       });
 
-      Alert.alert(
-        'Added to Bag',
-        `${product.name} with ${selectedLens.title} has been added to your shopping bag.`,
-        [
-          { text: 'Keep Shopping', onPress: () => navigation.navigate('HomeTab') },
-          { text: 'Go to Bag', onPress: () => navigation.navigate('CartTab') },
-        ]
-      );
+      showConfirm({
+        type: 'success',
+        title: 'Added to Bag',
+        message: `${product.name} with ${selectedLens.title} has been added to your shopping bag.`,
+        confirmText: 'Go to Bag',
+        cancelText: 'Keep Shopping',
+        onConfirm: () => navigation.navigate('CartTab'),
+      });
     } else {
       // Powered lens requires prescription
       navigation.navigate('PowerPrescription', {
