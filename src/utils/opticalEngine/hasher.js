@@ -1,14 +1,29 @@
 /**
- * Deterministic Configuration Hasher
+ * Deterministic Configuration Hasher (Mobile)
  * Produces a stable, unique hash for any optical configuration.
  * Excludes quantity so identical configurations can merge.
+ * Distinct color variants and lens packages generate distinct hashes.
  */
 
 export function generateConfigurationHash(productId, configuration = {}) {
+  const colorName = (
+    configuration.variantName ||
+    configuration.frameColor ||
+    configuration.selectedColor ||
+    configuration.color ||
+    ''
+  ).toLowerCase().trim();
+
+  const variantKey = (
+    configuration.variantId ||
+    (colorName ? `var-${colorName.replace(/\s+/g, '-')}` : 'default')
+  ).toLowerCase().trim();
+
   const norm = {
     pid: String(productId || ''),
     pt: configuration.productType || '',
-    v: configuration.variantId || 'default',
+    v: variantKey,
+    color: colorName,
     lt: configuration.lensSelection?.lensType || '',
     lid: configuration.lensSelection?.lensId || '',
     pm: configuration.prescription?.method || '',
@@ -16,13 +31,13 @@ export function generateConfigurationHash(productId, configuration = {}) {
       sph: configuration.prescription?.od?.sph || '',
       cyl: configuration.prescription?.od?.cyl || '',
       axis: configuration.prescription?.od?.axis || '',
-      add: configuration.prescription?.od?.add || ''
+      add: configuration.prescription?.od?.add || '',
     },
     os: {
       sph: configuration.prescription?.os?.sph || '',
       cyl: configuration.prescription?.os?.cyl || '',
       axis: configuration.prescription?.os?.axis || '',
-      add: configuration.prescription?.os?.add || ''
+      add: configuration.prescription?.os?.add || '',
     },
     pd: configuration.prescription?.pd || '',
     rxFile: configuration.prescription?.fileId || configuration.prescription?.fileName || '',
@@ -31,15 +46,15 @@ export function generateConfigurationHash(productId, configuration = {}) {
     cl_od: {
       sph: configuration.contactLens?.od?.sph || '',
       cyl: configuration.contactLens?.od?.cyl || '',
-      axis: configuration.contactLens?.od?.axis || ''
+      axis: configuration.contactLens?.od?.axis || '',
     },
     cl_os: {
       sph: configuration.contactLens?.os?.sph || '',
       cyl: configuration.contactLens?.os?.cyl || '',
-      axis: configuration.contactLens?.os?.axis || ''
+      axis: configuration.contactLens?.os?.axis || '',
     },
     sg_mode: configuration.sunglass?.mode || 'standard',
-    sg_lt: configuration.sunglass?.lensType || ''
+    sg_lt: configuration.sunglass?.lensType || '',
   };
 
   const str = JSON.stringify(norm);
@@ -51,3 +66,5 @@ export function generateConfigurationHash(productId, configuration = {}) {
   }
   return `cfg_${Math.abs(hash).toString(36)}_${norm.v}`;
 }
+
+export default generateConfigurationHash;

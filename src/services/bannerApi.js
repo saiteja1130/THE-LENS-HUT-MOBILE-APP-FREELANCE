@@ -1,10 +1,4 @@
-import { Platform } from 'react-native';
-
-const BASE_URL = Platform.select({
-  android: 'http://10.0.2.2:5000/api/v1',
-  ios: 'http://localhost:5000/api/v1',
-  default: 'http://localhost:5000/api/v1',
-});
+import { api } from './api';
 
 export const bannerApi = {
   /**
@@ -12,21 +6,13 @@ export const bannerApi = {
    */
   getActiveBanners: async (position = 'hero') => {
     try {
-      const response = await fetch(`${BASE_URL}/banners?position=${position}`, {
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      if (!response.ok) {
-        return { success: false, data: [] };
-      }
-
-      const data = await response.json();
+      const res = await api.get(`/banners?position=${position}`);
       return {
-        success: true,
-        data: Array.isArray(data.data) ? data.data : [],
+        success: Boolean(res?.success),
+        data: Array.isArray(res?.data) ? res.data : [],
       };
     } catch (error) {
-      console.warn('[BannerApi Mobile] Fetch failed, falling back to local mock data:', error.message);
+      console.warn('[BannerApi Mobile Axios] Fetch failed, falling back to local mock data:', error.message);
       return { success: false, data: [] };
     }
   },

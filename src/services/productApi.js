@@ -1,10 +1,4 @@
-import { Platform } from 'react-native';
-
-const BASE_URL = Platform.select({
-  android: 'http://10.0.2.2:5000/api/v1',
-  ios: 'http://localhost:5000/api/v1',
-  default: 'http://localhost:5000/api/v1',
-});
+import { api } from './api';
 
 export const normalizeMobileProduct = (p) => {
   if (!p) return null;
@@ -55,6 +49,7 @@ export const normalizeMobileProduct = (p) => {
     imageList: imagesArr,
     description: p.description || '',
     inStock: p.stock !== undefined ? p.stock > 0 : true,
+    isInWishlist: Boolean(p.isInWishlist),
   };
 };
 
@@ -71,22 +66,18 @@ export const productApi = {
         }
       });
 
-      const response = await fetch(`${BASE_URL}/products?${queryParams.toString()}`, {
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const queryString = queryParams.toString();
+      const res = await api.get(`/products${queryString ? `?${queryString}` : ''}`);
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && Array.isArray(result.data)) {
-          return {
-            success: true,
-            data: result.data.map(normalizeMobileProduct),
-            pagination: result.pagination || { total: result.data.length, page: 1, limit: result.data.length, totalPages: 1 },
-          };
-        }
+      if (res?.success && Array.isArray(res.data)) {
+        return {
+          success: true,
+          data: res.data.map(normalizeMobileProduct),
+          pagination: res.pagination || { total: res.data.length, page: 1, limit: res.data.length, totalPages: 1 },
+        };
       }
     } catch (error) {
-      console.warn('[ProductApi Mobile] Fetch failed:', error.message);
+      console.warn('[ProductApi Mobile Axios] Fetch failed:', error.message);
     }
 
     return {
@@ -101,21 +92,15 @@ export const productApi = {
    */
   getProductByIdOrSlug: async (idOrSlug) => {
     try {
-      const response = await fetch(`${BASE_URL}/products/${idOrSlug}`, {
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.data) {
-          return {
-            success: true,
-            data: normalizeMobileProduct(result.data),
-          };
-        }
+      const res = await api.get(`/products/${idOrSlug}`);
+      if (res?.success && res.data) {
+        return {
+          success: true,
+          data: normalizeMobileProduct(res.data),
+        };
       }
     } catch (error) {
-      console.warn('[ProductApi Mobile] Product detail fetch failed:', error.message);
+      console.warn('[ProductApi Mobile Axios] Product detail fetch failed:', error.message);
     }
 
     return {
@@ -129,21 +114,15 @@ export const productApi = {
    */
   getFeaturedProducts: async (limit = 10) => {
     try {
-      const response = await fetch(`${BASE_URL}/products/featured?limit=${limit}`, {
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && Array.isArray(result.data)) {
-          return {
-            success: true,
-            data: result.data.map(normalizeMobileProduct),
-          };
-        }
+      const res = await api.get(`/products/featured?limit=${limit}`);
+      if (res?.success && Array.isArray(res.data)) {
+        return {
+          success: true,
+          data: res.data.map(normalizeMobileProduct),
+        };
       }
     } catch (error) {
-      console.warn('[ProductApi Mobile] Featured products fetch failed:', error.message);
+      console.warn('[ProductApi Mobile Axios] Featured products fetch failed:', error.message);
     }
 
     return {

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { storage, STORAGE_KEYS } from '../utils/storage';
 import { authApi } from '../services/authApi';
+import useWishlistStore from './wishlistStore';
+import useCartStore from './cartStore';
 
 export const useAuthStore = create((set, get) => ({
   user: null,
@@ -29,6 +31,8 @@ export const useAuthStore = create((set, get) => ({
       await storage.set(STORAGE_KEYS.AUTH_TOKEN, token);
       await storage.set(STORAGE_KEYS.USER, userData);
       set({ user: userData, token, isAuthenticated: true });
+      useWishlistStore.getState().syncWithServer().catch(() => {});
+      useCartStore.getState().syncWithServer().catch(() => {});
       return true;
     } catch (e) {
       console.error('Login error:', e);
@@ -44,6 +48,8 @@ export const useAuthStore = create((set, get) => ({
       await storage.set(STORAGE_KEYS.AUTH_TOKEN, token);
       await storage.set(STORAGE_KEYS.USER, user);
       set({ user, token, isAuthenticated: true });
+      useWishlistStore.getState().syncWithServer().catch(() => {});
+      useCartStore.getState().syncWithServer().catch(() => {});
       return { success: true, user };
     }
     return res;
@@ -62,6 +68,8 @@ export const useAuthStore = create((set, get) => ({
       await storage.set(STORAGE_KEYS.AUTH_TOKEN, token);
       await storage.set(STORAGE_KEYS.USER, user);
       set({ user, token, isAuthenticated: true });
+      useWishlistStore.getState().syncWithServer().catch(() => {});
+      useCartStore.getState().syncWithServer().catch(() => {});
       return { success: true, user };
     }
     return res;

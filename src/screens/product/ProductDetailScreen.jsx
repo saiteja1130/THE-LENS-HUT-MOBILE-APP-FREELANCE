@@ -153,6 +153,7 @@ export const ProductDetailScreen = ({ route, navigation }) => {
   const handleSunglassesAction = async () => {
     await addItem(product, {
       frameColor: selectedColor,
+      image: activeImages[0] || '',
       lensType: 'Polarized UV400 Sun Lens',
       lensPrice: 0,
       sunglass: {
@@ -174,6 +175,7 @@ export const ProductDetailScreen = ({ route, navigation }) => {
   const handleDirectAddFrame = async () => {
     await addItem(product, {
       frameColor: selectedColor,
+      image: activeImages[0] || '',
       lensType: 'Zero Power (Frame Only)',
       lensPrice: 0,
       quantity: 1,
