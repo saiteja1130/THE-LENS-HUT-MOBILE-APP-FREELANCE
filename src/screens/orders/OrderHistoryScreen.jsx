@@ -18,13 +18,24 @@ import ScreenHeader from '../../components/common/ScreenHeader';
 import Badge from '../../components/common/Badge';
 import EmptyState from '../../components/common/EmptyState';
 import { storage } from '../../utils/storage';
+import { orderApi } from '../../services/orderApi';
 
 export const OrderHistoryScreen = ({ navigation }) => {
   const [orders, setOrders] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadOrders = async () => {
+      try {
+        const res = await orderApi.getMyOrders();
+        if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setOrders(res.data);
+          await storage.set('tlh_orders', res.data);
+          return;
+        }
+      } catch (apiErr) {
+        console.warn('[OrderHistoryScreen Mobile] Failed to fetch live orders:', apiErr);
+      }
+
       try {
         const savedOrders = await storage.get('tlh_orders');
         if (Array.isArray(savedOrders)) {
@@ -34,8 +45,6 @@ export const OrderHistoryScreen = ({ navigation }) => {
         }
       } catch (e) {
         setOrders([]);
-      } finally {
-        setIsLoading(false);
       }
     };
 
@@ -48,6 +57,7 @@ export const OrderHistoryScreen = ({ navigation }) => {
         return 'success';
       case 'processing':
       case 'laboratory processing':
+      case 'shipped':
         return 'warning';
       case 'cancelled':
         return 'error';
@@ -57,7 +67,17 @@ export const OrderHistoryScreen = ({ navigation }) => {
   };
 
   const renderOrderItem = ({ item }) => {
+    const orderId = item.orderNumber || item.id || item._id;
+    const orderDate = item.date || item.createdAt || item.orderDate;
+    const orderStatus = item.orderStatus || item.status || 'Processing';
+    const orderTotal = Number(item.totalAmount !== undefined ? item.totalAmount : item.total) || 0;
+
     const firstItem = item.items && item.items[0];
+    const firstItemImg =
+      firstItem?.image ||
+      firstItem?.product?.images?.front ||
+      firstItem?.product?.primaryImage ||
+      '';
     const totalItemCount = item.items ? item.items.reduce((s, i) => s + (i.quantity || 1), 0) : 1;
 
     return (
@@ -68,31 +88,31 @@ export const OrderHistoryScreen = ({ navigation }) => {
       >
         <View style={styles.cardHeader}>
           <View>
-            <Text style={styles.orderId}>{item.id}</Text>
-            <Text style={styles.orderDate}>{formatDate(item.date, 'medium')}</Text>
+            <Text style={styles.orderId}>{orderId}</Text>
+            <Text style={styles.orderDate}>{formatDate(orderDate, 'medium')}</Text>
           </View>
 
           <Badge
-            label={item.status || 'Order Placed'}
-            variant={getStatusVariant(item.status)}
+            label={orderStatus}
+            variant={getStatusVariant(orderStatus)}
             size="md"
           />
         </View>
 
         <View style={styles.cardContent}>
-          {firstItem && (
+          {firstItemImg ? (
             <Image
-              source={{ uri: firstItem.image }}
+              source={{ uri: firstItemImg }}
               style={styles.orderThumb}
             />
-          )}
+          ) : null}
 
           <View style={styles.orderItemDetails}>
             <Text style={styles.firstItemName} numberOfLines={1}>
               {firstItem?.name || 'Eyewear Frame'}
             </Text>
             <Text style={styles.firstItemSub} numberOfLines={1}>
-              {firstItem?.lensType || 'Precision Lenses'}
+              {firstItem?.lensType || firstItem?.configuration?.lensSelection?.lensName || 'Precision Lenses'}
             </Text>
             <Text style={styles.itemsSummary}>
               {totalItemCount} {totalItemCount === 1 ? 'item' : 'items'} in this order
@@ -103,7 +123,7 @@ export const OrderHistoryScreen = ({ navigation }) => {
         <View style={styles.cardFooter}>
           <View>
             <Text style={styles.totalLabel}>Total Amount</Text>
-            <Text style={styles.totalValue}>{formatCurrency(item.total)}</Text>
+            <Text style={styles.totalValue}>{formatCurrency(orderTotal)}</Text>
           </View>
 
           <View style={styles.viewDetailsRow}>

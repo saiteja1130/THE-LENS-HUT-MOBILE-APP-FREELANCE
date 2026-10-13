@@ -5,10 +5,8 @@ import {
   StyleSheet,
   ScrollView,
   Image,
-  TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   StatusBar,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -23,6 +21,7 @@ import useCartStore from '../../store/cartStore';
 import useAuthStore from '../../store/authStore';
 import useFeedbackStore from '../../store/feedbackStore';
 import { storage } from '../../utils/storage';
+import { orderApi } from '../../services/orderApi';
 
 export const CheckoutScreen = ({ navigation }) => {
   const user = useAuthStore((state) => state.user);
@@ -83,15 +82,22 @@ export const CheckoutScreen = ({ navigation }) => {
     setIsSubmitting(true);
 
     try {
-      const orderId = `TLH-${Math.floor(100000 + Math.random() * 900000)}`;
-      const order = {
-        id: orderId,
-        date: new Date().toISOString(),
-        items: [...items],
-        subtotal,
-        deliveryFee,
-        discount,
-        total,
+      const orderPayload = {
+        items: items.map((i) => ({
+          productId: i.productId || i.product?._id || i.product?.id || i.id,
+          name: i.name,
+          brand: i.brand || 'The Lens Hut',
+          sku: i.sku || 'LH-OPTICAL',
+          image: i.image || '',
+          quantity: i.quantity || 1,
+          unitPrice: i.price || i.unitPrice || 0,
+          totalPrice: ((i.price || i.unitPrice || 0) + (i.lensPrice || 0)) * (i.quantity || 1),
+          selectedColor: i.frameColor || i.selectedColor || 'Standard',
+          configuration: {
+            lensSelection: { lensName: i.lensType },
+            prescription: i.prescription,
+          },
+        })),
         shippingAddress: {
           fullName: fullName.trim(),
           phone: phone.trim(),
@@ -102,19 +108,58 @@ export const CheckoutScreen = ({ navigation }) => {
           state: stateName.trim(),
         },
         paymentMethod: 'Cash on Delivery (Pay on Delivery)',
-        status: 'Order Placed',
+        subtotal,
+        shippingFee: deliveryFee,
+        discount,
+        total,
       };
 
-      // Save order to persistent storage
+      let finalOrder = null;
+      try {
+        const apiRes = await orderApi.createOrder(orderPayload);
+        if (apiRes && apiRes.success && apiRes.data) {
+          finalOrder = {
+            ...apiRes.data,
+            id: apiRes.data.orderNumber || apiRes.data.id || apiRes.data._id,
+            date: apiRes.data.createdAt || apiRes.data.orderDate || new Date().toISOString(),
+            status: apiRes.data.orderStatus || 'Order Placed',
+            deliveryFee: apiRes.data.shippingFee !== undefined ? apiRes.data.shippingFee : deliveryFee,
+            items: apiRes.data.items?.length ? apiRes.data.items : [...items],
+          };
+        }
+      } catch (apiErr) {
+        console.warn('[Checkout Mobile] API call failed, using offline fallback:', apiErr);
+      }
+
+      // Offline fallback if server is unreachable
+      if (!finalOrder) {
+        const orderId = `LH-${Math.floor(100000 + Math.random() * 900000)}`;
+        finalOrder = {
+          id: orderId,
+          orderNumber: orderId,
+          date: new Date().toISOString(),
+          items: [...items],
+          subtotal,
+          deliveryFee,
+          discount,
+          total,
+          shippingAddress: orderPayload.shippingAddress,
+          paymentMethod: 'Cash on Delivery (Pay on Delivery)',
+          status: 'Order Placed',
+          orderStatus: 'Processing',
+        };
+      }
+
+      // Save order to persistent local storage
       const existingOrders = (await storage.get('tlh_orders')) || [];
-      await storage.set('tlh_orders', [order, ...existingOrders]);
+      await storage.set('tlh_orders', [finalOrder, ...existingOrders]);
 
       // Clear cart
       await clearCart();
       setIsSubmitting(false);
 
       // Navigate to Order Success Screen
-      navigation.replace('OrderSuccess', { order });
+      navigation.replace('OrderSuccess', { order: finalOrder });
     } catch (e) {
       console.error('Order creation error:', e);
       setIsSubmitting(false);

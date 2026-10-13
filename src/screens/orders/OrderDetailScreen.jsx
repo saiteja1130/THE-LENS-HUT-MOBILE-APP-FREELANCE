@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   Image,
-  TouchableOpacity,
   StatusBar,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -26,10 +25,19 @@ const ORDER_STEPS = [
 ];
 
 export const OrderDetailScreen = ({ route, navigation }) => {
-  const { order } = route.params;
+  const { order: initialOrder } = route.params || {};
+  const order = initialOrder || {};
+
+  const orderId = order.orderNumber || order.id || order._id || 'LH-ORDER';
+  const orderDate = order.date || order.createdAt || order.orderDate;
+  const orderStatus = order.orderStatus || order.status || 'Order Placed';
+  const orderSubtotal = Number(order.subtotal || order.total || 0);
+  const orderDeliveryFee = Number(order.shippingFee !== undefined ? order.shippingFee : (order.deliveryFee !== undefined ? order.deliveryFee : order.shipping || 0));
+  const orderDiscount = Number(order.discountAmount !== undefined ? order.discountAmount : (order.discount || 0));
+  const orderTotal = Number(order.totalAmount !== undefined ? order.totalAmount : (order.total || 0));
 
   const getActiveStepIndex = () => {
-    const s = order.status?.toLowerCase() || '';
+    const s = orderStatus.toLowerCase();
     if (s.includes('delivered')) return 3;
     if (s.includes('dispatch') || s.includes('shipped')) return 2;
     if (s.includes('lab') || s.includes('process')) return 1;
@@ -41,7 +49,7 @@ export const OrderDetailScreen = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.surface} />
-      <ScreenHeader title={`Order ${order.id}`} />
+      <ScreenHeader title={`Order ${orderId}`} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -51,11 +59,11 @@ export const OrderDetailScreen = ({ route, navigation }) => {
         <View style={styles.card}>
           <View style={styles.headerRow}>
             <View>
-              <Text style={styles.orderIdText}>{order.id}</Text>
-              <Text style={styles.dateText}>Placed on {formatDate(order.date, 'long')}</Text>
+              <Text style={styles.orderIdText}>{orderId}</Text>
+              <Text style={styles.dateText}>Placed on {formatDate(orderDate, 'long')}</Text>
             </View>
             <Badge
-              label={order.status || 'Order Placed'}
+              label={orderStatus}
               variant="info"
               size="md"
             />
@@ -110,29 +118,41 @@ export const OrderDetailScreen = ({ route, navigation }) => {
         {/* Ordered Items */}
         <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>Items Ordered ({order.items?.length || 1})</Text>
-          {order.items?.map((item, idx) => (
-            <View key={idx} style={styles.itemRow}>
-              <Image source={{ uri: item.image }} style={styles.itemThumb} />
-              <View style={styles.itemInfo}>
-                <Text style={styles.itemName}>{item.name}</Text>
-                <Text style={styles.itemOptions}>
-                  Color: {item.frameColor} • Qty: {item.quantity}
-                </Text>
-                <Text style={styles.itemLens}>Lens: {item.lensType}</Text>
-                {item.prescription && (
-                  <View style={styles.rxBadge}>
-                    <Text style={styles.rxText}>Custom Vision Rx Attached</Text>
-                  </View>
-                )}
-                <Text style={styles.itemPrice}>
-                  {formatCurrency((item.price + (item.lensPrice || 0)) * item.quantity)}
-                </Text>
+          {order.items?.map((item, idx) => {
+            const itemImg = item.image || item.product?.images?.front || item.product?.primaryImage || '';
+            const itemName = item.name || 'Optical Eyewear';
+            const itemColor = item.frameColor || item.selectedColor || item.variantName || 'Standard';
+            const itemLens = item.lensType || item.configuration?.lensSelection?.lensName || 'Optical Lab Custom Lens';
+            const hasRx = item.prescription || order.prescription?.hasPrescription;
+            const itemUnitPrice = Number(item.unitPrice !== undefined ? item.unitPrice : item.price || 0);
+            const itemTotal = Number(item.totalPrice !== undefined ? item.totalPrice : (itemUnitPrice + (item.lensPrice || 0)) * (item.quantity || 1));
+
+            return (
+              <View key={idx} style={styles.itemRow}>
+                {itemImg ? (
+                  <Image source={{ uri: itemImg }} style={styles.itemThumb} />
+                ) : null}
+                <View style={styles.itemInfo}>
+                  <Text style={styles.itemName}>{itemName}</Text>
+                  <Text style={styles.itemOptions}>
+                    Color: {itemColor} • Qty: {item.quantity || 1}
+                  </Text>
+                  <Text style={styles.itemLens}>Lens: {itemLens}</Text>
+                  {hasRx && (
+                    <View style={styles.rxBadge}>
+                      <Text style={styles.rxText}>Custom Vision Rx Attached</Text>
+                    </View>
+                  )}
+                  <Text style={styles.itemPrice}>
+                    {formatCurrency(itemTotal)}
+                  </Text>
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
 
-        {/* Shipping Address (Filled directly by user during checkout) */}
+        {/* Shipping Address */}
         <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>Shipping Address</Text>
           <View style={styles.addressBox}>
@@ -153,37 +173,37 @@ export const OrderDetailScreen = ({ route, navigation }) => {
           <Text style={styles.cardSectionTitle}>Payment & Invoicing</Text>
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Payment Mode</Text>
-            <Text style={styles.priceValue}>{order.paymentMethod}</Text>
+            <Text style={styles.priceValue}>{order.paymentMethod || 'Cash on Delivery'}</Text>
           </View>
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Items Subtotal</Text>
             <Text style={styles.priceValue}>
-              {formatCurrency(order.subtotal || order.total)}
+              {formatCurrency(orderSubtotal)}
             </Text>
           </View>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Shipping</Text>
+            <Text style={styles.priceLabel}>Shipping Fee</Text>
             <Text
               style={[
                 styles.priceValue,
-                order.deliveryFee === 0 && { color: COLORS.success },
+                orderDeliveryFee === 0 && { color: COLORS.success },
               ]}
             >
-              {order.deliveryFee === 0 ? 'FREE' : formatCurrency(order.deliveryFee || 0)}
+              {orderDeliveryFee === 0 ? 'FREE' : formatCurrency(orderDeliveryFee)}
             </Text>
           </View>
-          {order.discount > 0 && (
+          {orderDiscount > 0 && (
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>Discount</Text>
               <Text style={[styles.priceValue, { color: COLORS.success }]}>
-                -{formatCurrency(order.discount)}
+                -{formatCurrency(orderDiscount)}
               </Text>
             </View>
           )}
           <View style={styles.divider} />
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total Paid / Payable</Text>
-            <Text style={styles.totalValue}>{formatCurrency(order.total)}</Text>
+            <Text style={styles.totalValue}>{formatCurrency(orderTotal)}</Text>
           </View>
         </View>
 
