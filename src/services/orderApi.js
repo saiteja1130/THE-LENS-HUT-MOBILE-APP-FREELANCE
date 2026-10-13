@@ -36,10 +36,27 @@ export const orderApi = {
 
   /**
    * Fetch specific order details by ID or Order Number
+   * @param {string} idOrOrderNumber
+   * @param {Object|string} options Verification options (email, phone) or tracking mode
    */
-  getOrderById: async (idOrOrderNumber) => {
+  getOrderById: async (idOrOrderNumber, options = {}) => {
     try {
-      const res = await api.get(`/orders/${encodeURIComponent(idOrOrderNumber)}`);
+      const params = [];
+      if (typeof options === 'string') {
+        if (options.includes('@')) {
+          params.push(`email=${encodeURIComponent(options)}`);
+        } else {
+          params.push(`phone=${encodeURIComponent(options)}`);
+        }
+      } else if (options && typeof options === 'object') {
+        if (options.email) params.push(`email=${encodeURIComponent(options.email)}`);
+        if (options.phone) params.push(`phone=${encodeURIComponent(options.phone)}`);
+        if (options.mode) params.push(`mode=${encodeURIComponent(options.mode)}`);
+        if (options.trackingOnly) params.push('trackingOnly=true');
+      }
+
+      const queryString = params.length > 0 ? `?${params.join('&')}` : '';
+      const res = await api.get(`/orders/${encodeURIComponent(idOrOrderNumber)}${queryString}`);
       return res;
     } catch (error) {
       console.warn('[orderApi Mobile] Fetch order by id failed:', error.message);
