@@ -104,13 +104,17 @@ export const VerifyEmailScreen = ({ navigation, route }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
+        bounces={false}
       >
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Ionicons name="arrow-back" size={24} color={COLORS.secondary} />
         </TouchableOpacity>
@@ -118,7 +122,7 @@ export const VerifyEmailScreen = ({ navigation, route }) => {
         <View style={styles.header}>
           <BrandLogo size="lg" />
           <View style={styles.iconContainer}>
-            <Ionicons name="shield-checkmark" size={36} color={COLORS.primary} />
+            <Ionicons name="shield-checkmark" size={34} color={COLORS.primary} />
           </View>
           <Text style={styles.title}>Verify Your Email</Text>
           <Text style={styles.subtitle}>
@@ -134,21 +138,24 @@ export const VerifyEmailScreen = ({ navigation, route }) => {
         )}
 
         <View style={styles.form}>
-          <Text style={styles.label}>Email Address</Text>
-          <TextInput
-            style={[styles.input, errors.email && styles.inputError]}
-            value={email}
-            onChangeText={(t) => {
-              setEmail(t);
-              if (errors.email) setErrors((e) => ({ ...e, email: null }));
-            }}
-            placeholder="name@example.com"
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-          {errors.email && <Text style={styles.fieldErrorText}>{errors.email}</Text>}
+          <View style={styles.labelRow}>
+            <Text style={styles.label}>Email Address</Text>
+            <View style={styles.lockedBadge}>
+              <Ionicons name="lock-closed" size={11} color={COLORS.textMuted} />
+              <Text style={styles.lockedText}>Locked</Text>
+            </View>
+          </View>
+          <View style={styles.disabledInputContainer}>
+            <Ionicons name="mail" size={18} color={COLORS.textMuted} style={styles.inputLeftIcon} />
+            <TextInput
+              style={styles.disabledInput}
+              value={email}
+              editable={false}
+              selectTextOnFocus={false}
+            />
+          </View>
 
-          <Text style={[styles.label, { marginTop: 16 }]}>6-Digit Verification Code</Text>
+          <Text style={[styles.label, { marginTop: 18,marginBottom:6 }]}>6-Digit Verification Code</Text>
           <TextInput
             style={[styles.otpInput, errors.otp && styles.inputError]}
             value={otp}
@@ -157,6 +164,7 @@ export const VerifyEmailScreen = ({ navigation, route }) => {
               if (errors.otp) setErrors((e) => ({ ...e, otp: null }));
             }}
             placeholder="••••••"
+            placeholderTextColor={COLORS.textMuted}
             keyboardType="number-pad"
             maxLength={6}
           />
@@ -188,7 +196,10 @@ export const VerifyEmailScreen = ({ navigation, route }) => {
             onPress={handleVerify}
             loading={isLoading}
             disabled={otp.length < 6}
+            variant="primary"
+            size="lg"
             style={styles.verifyButton}
+            textStyle={styles.verifyButtonText}
           />
         </View>
       </ScrollView>
@@ -201,42 +212,50 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.surface,
   },
+  scrollView: {
+    flex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
-    padding: LAYOUT.screenPadding,
-    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 40,
   },
   backButton: {
-    alignSelf: 'flex-start',
-    padding: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.borderLight,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 8,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   iconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: COLORS.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 16,
+    marginVertical: 12,
   },
   title: {
-    fontFamily: FONTS.family.bold,
-    fontSize: FONTS.size.xxl,
+    fontFamily: FONTS.bold,
+    fontSize: 24,
     color: COLORS.secondary,
     textAlign: 'center',
   },
   subtitle: {
-    fontFamily: FONTS.family.regular,
-    fontSize: FONTS.size.sm,
+    fontFamily: FONTS.regular,
+    fontSize: 14,
     color: COLORS.textSecondary,
     textAlign: 'center',
     marginTop: 6,
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     lineHeight: 20,
   },
   errorBanner: {
@@ -252,46 +271,76 @@ const styles = StyleSheet.create({
   },
   errorBannerText: {
     flex: 1,
-    fontFamily: FONTS.family.medium,
-    fontSize: FONTS.size.xs,
+    fontFamily: FONTS.medium,
+    fontSize: 12,
     color: COLORS.error,
   },
   form: {
     marginTop: 8,
   },
-  label: {
-    fontFamily: FONTS.family.bold,
-    fontSize: FONTS.size.xs,
-    color: COLORS.secondary,
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 6,
   },
-  input: {
-    height: 48,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    fontFamily: FONTS.family.regular,
-    fontSize: FONTS.size.sm,
+  label: {
+    fontFamily: FONTS.bold,
+    fontSize: 13,
     color: COLORS.secondary,
+  },
+  lockedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: COLORS.borderLight,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  lockedText: {
+    fontFamily: FONTS.medium,
+    fontSize: 11,
+    color: COLORS.textMuted,
+  },
+  disabledInputContainer: {
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+  },
+  inputLeftIcon: {
+    marginRight: 8,
+  },
+  disabledInput: {
+    flex: 1,
+    fontFamily: FONTS.regular,
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    padding: 0,
   },
   otpInput: {
     height: 56,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderDark,
     borderRadius: 12,
     textAlign: 'center',
     letterSpacing: 10,
-    fontFamily: FONTS.family.bold,
+    fontFamily: FONTS.bold,
     fontSize: 24,
     color: COLORS.secondary,
+    backgroundColor: COLORS.surface,
   },
   inputError: {
     borderColor: COLORS.error,
     backgroundColor: COLORS.errorLight,
   },
   fieldErrorText: {
-    fontFamily: FONTS.family.medium,
+    fontFamily: FONTS.medium,
     fontSize: 11,
     color: COLORS.error,
     marginTop: 4,
@@ -301,17 +350,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 18,
-    marginBottom: 24,
+    marginBottom: 20,
     gap: 6,
   },
   resendHint: {
-    fontFamily: FONTS.family.regular,
-    fontSize: FONTS.size.xs,
+    fontFamily: FONTS.regular,
+    fontSize: 12,
     color: COLORS.textSecondary,
   },
   resendButtonText: {
-    fontFamily: FONTS.family.bold,
-    fontSize: FONTS.size.xs,
+    fontFamily: FONTS.bold,
+    fontSize: 12,
     color: COLORS.primary,
   },
   resendDisabled: {
@@ -319,6 +368,14 @@ const styles = StyleSheet.create({
   },
   verifyButton: {
     marginTop: 8,
+    height: 52,
+    borderRadius: 12,
+  },
+  verifyButtonText: {
+    color: '#FFFFFF',
+    fontFamily: FONTS.bold,
+    fontSize: 16,
+    letterSpacing: 0.3,
   },
 });
 

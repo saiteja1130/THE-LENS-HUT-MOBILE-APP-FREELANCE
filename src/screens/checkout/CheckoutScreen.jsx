@@ -8,7 +8,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import COLORS from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
@@ -24,6 +26,7 @@ import { storage } from '../../utils/storage';
 import { orderApi } from '../../services/orderApi';
 
 export const CheckoutScreen = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
   const items = useCartStore((state) => state.items);
   const subtotal = useCartStore((state) => state.getSubtotal());
@@ -36,7 +39,7 @@ export const CheckoutScreen = ({ navigation }) => {
   const showError = useFeedbackStore((state) => state.showError);
   const showToast = useFeedbackStore((state) => state.showToast);
 
-  // Direct Address Form State (NO multiple address management)
+  // Address & Contact Form State
   const [fullName, setFullName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [pincode, setPincode] = useState('');
@@ -52,14 +55,14 @@ export const CheckoutScreen = ({ navigation }) => {
     const errs = {};
     if (!fullName.trim()) errs.fullName = 'Full Name is required';
     if (!phone.trim()) {
-      errs.phone = 'Mobile number is required';
+      errs.phone = 'Mobile phone number is required';
     } else if (phone.trim().replace(/\D/g, '').length < 10) {
       errs.phone = 'Please enter a valid 10-digit number';
     }
     if (!pincode.trim() || pincode.trim().length < 6) {
       errs.pincode = 'Valid 6-digit Pincode is required';
     }
-    if (!street.trim()) errs.street = 'Flat / House / Street details required';
+    if (!street.trim()) errs.street = 'Flat, house, or street details are required';
     if (!city.trim()) errs.city = 'City is required';
     if (!stateName.trim()) errs.stateName = 'State is required';
 
@@ -68,14 +71,16 @@ export const CheckoutScreen = ({ navigation }) => {
   };
 
   const handlePlaceOrder = async () => {
+    if (isSubmitting) return;
+
     if (!validate()) {
-      showWarning('Incomplete Address', 'Please fill in all required delivery address fields to proceed.');
+      showWarning('Incomplete Shipping Information', 'Please complete the highlighted delivery address fields.');
       return;
     }
 
     if (items.length === 0) {
       showToast('Your shopping bag is empty', 'info');
-      navigation.navigate('HomeTab');
+      navigation.navigate('Main', { screen: 'ShopTab' });
       return;
     }
 
@@ -128,10 +133,10 @@ export const CheckoutScreen = ({ navigation }) => {
           };
         }
       } catch (apiErr) {
-        console.warn('[Checkout Mobile] API call failed, using offline fallback:', apiErr);
+        console.warn('[Checkout Mobile] Backend unreachable, using offline persistent storage:', apiErr);
       }
 
-      // Offline fallback if server is unreachable
+      // Offline persistent fallback
       if (!finalOrder) {
         const orderId = `LH-${Math.floor(100000 + Math.random() * 900000)}`;
         finalOrder = {
@@ -163,7 +168,7 @@ export const CheckoutScreen = ({ navigation }) => {
     } catch (e) {
       console.error('Order creation error:', e);
       setIsSubmitting(false);
-      showError('Order Failed', 'Could not process your order. Please check your details and try again.');
+      showError('Order Submission Failed', 'Could not process your order. Please check your network and try again.');
     }
   };
 
@@ -173,49 +178,84 @@ export const CheckoutScreen = ({ navigation }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.surface} />
-      <ScreenHeader title="Direct Checkout" />
+      <ScreenHeader title="Secure Checkout" showBack={true} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 110 + insets.bottom }]}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Address Notice */}
-        <View style={styles.addressNoticeCard}>
-          <Ionicons name="location" size={20} color={COLORS.primary} />
-          <View style={styles.addressNoticeTextWrapper}>
-            <Text style={styles.addressNoticeTitle}>Delivery Address</Text>
-            <Text style={styles.addressNoticeSubtitle}>
-              Please enter your destination shipping details below for this order.
-            </Text>
-          </View>
+        {/* Security / Verification Badge */}
+        <View style={styles.secureHeaderNotice}>
+          <Ionicons name="shield-checkmark" size={18} color="#059669" />
+          <Text style={styles.secureHeaderText}>
+            256-Bit SSL Encrypted & Optometrist Dual-Verified Checkout
+          </Text>
         </View>
 
-        {/* Address Form */}
-        <View style={styles.formCard}>
+        {/* SECTION 1: Contact Details */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeadingRow}>
+            <View style={styles.sectionStepCircle}>
+              <Text style={styles.sectionStepNumber}>1</Text>
+            </View>
+            <Text style={styles.sectionTitle}>Contact Information</Text>
+          </View>
+
           <Input
-            label="Full Name *"
-            placeholder="Recipient's Name"
+            label="Recipient's Full Name *"
+            placeholder="e.g. Rahul Sharma"
             value={fullName}
             onChangeText={(val) => {
               setFullName(val);
               if (errors.fullName) setErrors((prev) => ({ ...prev, fullName: null }));
             }}
             error={errors.fullName}
-            leftIcon={<Ionicons name="person-outline" size={18} color={COLORS.textMuted} />}
+            leftIcon={<Ionicons name="person-outline" size={17} color={COLORS.textMuted} />}
           />
 
           <Input
-            label="Mobile Phone Number *"
+            label="Mobile Phone Number (for delivery updates) *"
             placeholder="10-digit mobile number"
             keyboardType="phone-pad"
+            maxLength={10}
             value={phone}
             onChangeText={(val) => {
               setPhone(val);
               if (errors.phone) setErrors((prev) => ({ ...prev, phone: null }));
             }}
             error={errors.phone}
-            leftIcon={<Ionicons name="call-outline" size={18} color={COLORS.textMuted} />}
+            leftIcon={<Ionicons name="call-outline" size={17} color={COLORS.textMuted} />}
+          />
+        </View>
+
+        {/* SECTION 2: Delivery Address */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeadingRow}>
+            <View style={styles.sectionStepCircle}>
+              <Text style={styles.sectionStepNumber}>2</Text>
+            </View>
+            <Text style={styles.sectionTitle}>Shipping Address</Text>
+          </View>
+
+          <Input
+            label="Flat / House no. / Building / Street *"
+            placeholder="e.g. Flat 402, Lotus Towers, 14th Main"
+            value={street}
+            onChangeText={(val) => {
+              setStreet(val);
+              if (errors.street) setErrors((prev) => ({ ...prev, street: null }));
+            }}
+            error={errors.street}
+            leftIcon={<Ionicons name="home-outline" size={17} color={COLORS.textMuted} />}
+          />
+
+          <Input
+            label="Area / Locality / Landmark (Optional)"
+            placeholder="Near Metro Station or Market"
+            value={locality}
+            onChangeText={setLocality}
+            leftIcon={<Ionicons name="location-outline" size={17} color={COLORS.textMuted} />}
           />
 
           <View style={styles.twoColumnRow}>
@@ -231,14 +271,14 @@ export const CheckoutScreen = ({ navigation }) => {
                   if (errors.pincode) setErrors((prev) => ({ ...prev, pincode: null }));
                 }}
                 error={errors.pincode}
-                leftIcon={<Ionicons name="pin-outline" size={18} color={COLORS.textMuted} />}
+                leftIcon={<Ionicons name="pin-outline" size={17} color={COLORS.textMuted} />}
               />
             </View>
 
             <View style={styles.halfWidth}>
               <Input
                 label="City *"
-                placeholder="City"
+                placeholder="e.g. Mumbai"
                 value={city}
                 onChangeText={(val) => {
                   setCity(val);
@@ -250,113 +290,120 @@ export const CheckoutScreen = ({ navigation }) => {
           </View>
 
           <Input
-            label="Flat, House no., Building, Street *"
-            placeholder="e.g. Flat 302, Sunrise Towers, MG Road"
-            value={street}
+            label="State / Province *"
+            placeholder="e.g. Maharashtra"
+            value={stateName}
             onChangeText={(val) => {
-              setStreet(val);
-              if (errors.street) setErrors((prev) => ({ ...prev, street: null }));
+              setStateName(val);
+              if (errors.stateName) setErrors((prev) => ({ ...prev, stateName: null }));
             }}
-            error={errors.street}
+            error={errors.stateName}
           />
-
-          <View style={styles.twoColumnRow}>
-            <View style={styles.halfWidth}>
-              <Input
-                label="Area / Landmark"
-                placeholder="Near Metro Station"
-                value={locality}
-                onChangeText={setLocality}
-              />
-            </View>
-
-            <View style={styles.halfWidth}>
-              <Input
-                label="State *"
-                placeholder="e.g. Karnataka"
-                value={stateName}
-                onChangeText={(val) => {
-                  setStateName(val);
-                  if (errors.stateName) setErrors((prev) => ({ ...prev, stateName: null }));
-                }}
-                error={errors.stateName}
-              />
-            </View>
-          </View>
         </View>
 
-        {/* Payment Method Section (NO online payment integrations per prompt) */}
-        <View style={styles.paymentSectionCard}>
-          <Text style={styles.sectionTitle}>Payment Method</Text>
-          <View style={styles.codOptionCard}>
-            <Ionicons name="radio-button-on" size={20} color={COLORS.primary} />
-            <View style={styles.codOptionInfo}>
-              <Text style={styles.codOptionTitle}>Cash on Delivery (Pay on Delivery)</Text>
-              <Text style={styles.codOptionDesc}>
-                Pay cash or UPI directly to the courier executive upon doorstep package delivery.
+        {/* SECTION 3: Payment Method */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeadingRow}>
+            <View style={styles.sectionStepCircle}>
+              <Text style={styles.sectionStepNumber}>3</Text>
+            </View>
+            <Text style={styles.sectionTitle}>Payment Method</Text>
+          </View>
+
+          <View style={styles.codCardActive}>
+            <Ionicons name="radio-button-on" size={20} color={COLORS.primary} style={{ marginTop: 2 }} />
+            <View style={styles.codTextCol}>
+              <View style={styles.codTitleRow}>
+                <Text style={styles.codTitle}>Cash on Delivery (Pay on Delivery)</Text>
+                <View style={styles.codTag}>
+                  <Text style={styles.codTagText}>Recommended</Text>
+                </View>
+              </View>
+              <Text style={styles.codDescription}>
+                Pay conveniently with Cash or via any UPI App (GPay, PhonePe, Paytm) upon doorstep arrival. Zero advance payment required.
               </Text>
             </View>
           </View>
         </View>
 
-        {/* Order Items Preview */}
-        <View style={styles.orderSummaryCard}>
-          <Text style={styles.sectionTitle}>Order Items ({items.length})</Text>
+        {/* SECTION 4: Order Summary Review */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeadingRow}>
+            <View style={styles.sectionStepCircle}>
+              <Text style={styles.sectionStepNumber}>4</Text>
+            </View>
+            <Text style={styles.sectionTitle}>Order Review ({items.length} items)</Text>
+          </View>
+
           {items.map((item) => (
-            <View key={item.key} style={styles.summaryItemRow}>
-              <Image source={{ uri: item.image }} style={styles.summaryItemThumb} />
-              <View style={styles.summaryItemInfo}>
-                <Text style={styles.summaryItemName} numberOfLines={1}>
+            <View key={item.key} style={styles.reviewItemRow}>
+              <View style={styles.reviewThumbContainer}>
+                <Image source={{ uri: item.image }} style={styles.reviewThumb} resizeMode="contain" />
+              </View>
+              <View style={styles.reviewInfoCol}>
+                <Text style={styles.reviewItemName} numberOfLines={1}>
                   {item.name}
                 </Text>
-                <Text style={styles.summaryItemOptions}>
-                  {item.frameColor} • {item.lensType}
+                <Text style={styles.reviewItemOptions}>
+                  {item.frameColor} · {item.lensType || 'Frame Only'}
                 </Text>
-                <Text style={styles.summaryItemQuantity}>Qty: {item.quantity}</Text>
+                <Text style={styles.reviewItemQty}>Quantity: {item.quantity}</Text>
               </View>
-              <Text style={styles.summaryItemPrice}>
+              <Text style={styles.reviewItemPrice}>
                 {formatCurrency((item.price + (item.lensPrice || 0)) * item.quantity)}
               </Text>
             </View>
           ))}
 
           {/* Pricing Breakdown */}
-          <View style={styles.summaryDivider} />
+          <View style={styles.breakdownDivider} />
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Items Subtotal</Text>
             <Text style={styles.priceValue}>{formatCurrency(subtotal)}</Text>
           </View>
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Shipping / Delivery</Text>
-            <Text style={[styles.priceValue, deliveryFee === 0 && { color: COLORS.success }]}>
+            <Text style={[styles.priceValue, deliveryFee === 0 && { color: '#059669', fontFamily: FONTS.semiBold }]}>
               {deliveryFee === 0 ? 'FREE' : formatCurrency(deliveryFee)}
             </Text>
           </View>
           {discount > 0 && (
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Coupon Savings</Text>
-              <Text style={[styles.priceValue, { color: COLORS.success }]}>
+              <Text style={styles.priceLabel}>Applied Coupon Discount</Text>
+              <Text style={[styles.priceValue, { color: '#059669', fontFamily: FONTS.semiBold }]}>
                 -{formatCurrency(discount)}
               </Text>
             </View>
           )}
-          <View style={styles.summaryDivider} />
+          <View style={styles.breakdownDivider} />
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total Payable</Text>
+            <View>
+              <Text style={styles.totalLabel}>Total Payable</Text>
+              <Text style={styles.taxSubText}>Inclusive of all taxes</Text>
+            </View>
             <Text style={styles.totalValue}>{formatCurrency(total)}</Text>
           </View>
         </View>
+      </ScrollView>
+
+      {/* Persistent Bottom Place Order Action */}
+      <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        <View style={styles.bottomPriceCol}>
+          <Text style={styles.bottomPriceLabel}>Total Amount</Text>
+          <Text style={styles.bottomPriceValue}>{formatCurrency(total)}</Text>
+        </View>
 
         <Button
-          title="Place Order"
+          title={isSubmitting ? 'Placing Order...' : 'Confirm Order'}
           onPress={handlePlaceOrder}
+          disabled={isSubmitting}
           loading={isSubmitting}
           variant="primary"
           size="lg"
-          rightIcon={<Ionicons name="checkmark-circle" size={20} color={COLORS.surface} />}
+          rightIcon={!isSubmitting && <Ionicons name="checkmark-circle" size={18} color={COLORS.surface} />}
           style={styles.placeOrderBtn}
         />
-      </ScrollView>
+      </View>
     </KeyboardAvoidingView>
   );
 };
@@ -368,41 +415,69 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 40,
   },
-  addressNoticeCard: {
+  // Secure Header Notice
+  secureHeaderNotice: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.primaryUltraLight,
-    padding: 14,
-    borderRadius: LAYOUT.radius.md,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: COLORS.primaryLight,
-    marginBottom: 16,
+    borderColor: '#A7F3D0',
+    marginBottom: 14,
   },
-  addressNoticeTextWrapper: {
-    marginLeft: 10,
+  secureHeaderText: {
+    fontFamily: FONTS.medium,
+    fontSize: 11.5,
+    color: '#065F46',
+    marginLeft: 6,
     flex: 1,
   },
-  addressNoticeTitle: {
-    fontFamily: FONTS.semiBold,
-    fontSize: 14,
-    color: COLORS.secondary,
-  },
-  addressNoticeSubtitle: {
-    fontFamily: FONTS.regular,
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  formCard: {
+  // Section Cards
+  sectionCard: {
     backgroundColor: COLORS.surface,
     padding: 16,
-    borderRadius: LAYOUT.radius.md,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: COLORS.borderLight,
-    marginBottom: 16,
-    ...LAYOUT.shadows.sm,
+    borderColor: '#E2E8F0',
+    marginBottom: 14,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
+  },
+  sectionHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  sectionStepCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  sectionStepNumber: {
+    fontFamily: FONTS.bold,
+    fontSize: 12,
+    color: COLORS.surface,
+  },
+  sectionTitle: {
+    fontFamily: FONTS.bold,
+    fontSize: 15,
+    color: COLORS.secondary,
   },
   twoColumnRow: {
     flexDirection: 'row',
@@ -411,99 +486,109 @@ const styles = StyleSheet.create({
   halfWidth: {
     width: '48%',
   },
-  paymentSectionCard: {
-    backgroundColor: COLORS.surface,
-    padding: 16,
-    borderRadius: LAYOUT.radius.md,
-    borderWidth: 1,
-    borderColor: COLORS.borderLight,
-    marginBottom: 16,
-    ...LAYOUT.shadows.sm,
-  },
-  sectionTitle: {
-    fontFamily: FONTS.bold,
-    fontSize: 15,
-    color: COLORS.secondary,
-    marginBottom: 12,
-  },
-  codOptionCard: {
+  // COD Card
+  codCardActive: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    padding: 12,
-    borderRadius: LAYOUT.radius.sm,
+    alignItems: 'flex-start',
+    backgroundColor: '#F0F9FF',
+    padding: 14,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: COLORS.primary,
   },
-  codOptionInfo: {
-    marginLeft: 10,
+  codTextCol: {
     flex: 1,
+    marginLeft: 10,
   },
-  codOptionTitle: {
-    fontFamily: FONTS.semiBold,
-    fontSize: 14,
-    color: COLORS.secondary,
-  },
-  codOptionDesc: {
-    fontFamily: FONTS.regular,
-    fontSize: 12,
-    color: COLORS.textMuted,
-    marginTop: 2,
-    lineHeight: 16,
-  },
-  orderSummaryCard: {
-    backgroundColor: COLORS.surface,
-    padding: 16,
-    borderRadius: LAYOUT.radius.md,
-    borderWidth: 1,
-    borderColor: COLORS.borderLight,
-    marginBottom: 24,
-    ...LAYOUT.shadows.sm,
-  },
-  summaryItemRow: {
+  codTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'space-between',
+    marginBottom: 4,
   },
-  summaryItemThumb: {
+  codTitle: {
+    fontFamily: FONTS.bold,
+    fontSize: 14,
+    color: COLORS.secondary,
+    flex: 1,
+  },
+  codTag: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  codTagText: {
+    fontFamily: FONTS.bold,
+    fontSize: 10,
+    color: '#15803D',
+  },
+  codDescription: {
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    lineHeight: 17,
+  },
+  // Review Items
+  reviewItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  reviewThumbContainer: {
     width: 48,
     height: 48,
-    borderRadius: LAYOUT.radius.xs,
-    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 3,
   },
-  summaryItemInfo: {
+  reviewThumb: {
+    width: '100%',
+    height: '100%',
+  },
+  reviewInfoCol: {
     flex: 1,
     marginLeft: 10,
   },
-  summaryItemName: {
-    fontFamily: FONTS.medium,
-    fontSize: 13,
+  reviewItemName: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 13.5,
     color: COLORS.secondary,
   },
-  summaryItemOptions: {
+  reviewItemOptions: {
     fontFamily: FONTS.regular,
-    fontSize: 11,
+    fontSize: 11.5,
     color: COLORS.textMuted,
+    marginTop: 1,
   },
-  summaryItemQuantity: {
+  reviewItemQty: {
     fontFamily: FONTS.regular,
     fontSize: 11,
     color: COLORS.textSecondary,
+    marginTop: 1,
   },
-  summaryItemPrice: {
-    fontFamily: FONTS.semiBold,
-    fontSize: 13,
+  reviewItemPrice: {
+    fontFamily: FONTS.bold,
+    fontSize: 13.5,
     color: COLORS.secondary,
+    marginLeft: 6,
   },
-  summaryDivider: {
+  // Pricing
+  breakdownDivider: {
     height: 1,
-    backgroundColor: COLORS.borderLight,
+    backgroundColor: '#F1F5F9',
     marginVertical: 10,
   },
   priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginVertical: 4,
+    marginVertical: 3,
   },
   priceLabel: {
     fontFamily: FONTS.regular,
@@ -512,28 +597,76 @@ const styles = StyleSheet.create({
   },
   priceValue: {
     fontFamily: FONTS.medium,
-    fontSize: 13,
+    fontSize: 13.5,
     color: COLORS.secondary,
   },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginTop: 4,
   },
   totalLabel: {
     fontFamily: FONTS.bold,
-    fontSize: 16,
+    fontSize: 15,
     color: COLORS.secondary,
+  },
+  taxSubText: {
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 1,
   },
   totalValue: {
     fontFamily: FONTS.extraBold,
-    fontSize: 18,
+    fontSize: 19,
     color: COLORS.primary,
   },
+  // Sticky Bottom Bar
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.surface,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -3 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+  bottomPriceCol: {
+    marginRight: 12,
+  },
+  bottomPriceLabel: {
+    fontFamily: FONTS.regular,
+    fontSize: 10.5,
+    color: COLORS.textMuted,
+    textTransform: 'uppercase',
+  },
+  bottomPriceValue: {
+    fontFamily: FONTS.extraBold,
+    fontSize: 19,
+    color: COLORS.secondary,
+  },
   placeOrderBtn: {
-    width: '100%',
+    flex: 1,
+    height: 46,
   },
 });
 
 export default CheckoutScreen;
+

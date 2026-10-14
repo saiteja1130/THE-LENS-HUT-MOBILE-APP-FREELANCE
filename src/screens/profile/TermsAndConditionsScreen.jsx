@@ -9,7 +9,7 @@ export const TermsAndConditionsScreen = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.surface} />
-      <ScreenHeader title="Terms & Conditions" />
+      <ScreenHeader title="Terms & Conditions" showBack={true} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

@@ -49,7 +49,7 @@ export const OrderDetailScreen = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.surface} />
-      <ScreenHeader title={`Order ${orderId}`} />
+      <ScreenHeader title={`Order ${orderId}`} showBack={true} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

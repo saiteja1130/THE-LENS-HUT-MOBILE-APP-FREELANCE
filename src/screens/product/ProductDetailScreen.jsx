@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,10 @@ import {
   TouchableOpacity,
   Dimensions,
   StatusBar,
+  FlatList,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import COLORS from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
@@ -21,12 +24,14 @@ import useCartStore from '../../store/cartStore';
 import useFeedbackStore from '../../store/feedbackStore';
 import productApi from '../../services/productApi';
 
-const { width } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const ProductDetailScreen = ({ route, navigation }) => {
+  const insets = useSafeAreaInsets();
   const incomingProduct = route.params?.product;
   const productId = route.params?.productId || incomingProduct?.id;
   const [product, setProduct] = useState(incomingProduct || null);
+  const carouselRef = useRef(null);
 
   useEffect(() => {
     if (!product && productId) {
@@ -87,21 +92,40 @@ export const ProductDetailScreen = ({ route, navigation }) => {
     if (colorImages.length > 0) {
       setActiveImages(colorImages);
       setSelectedImageIndex(0);
+      carouselRef.current?.scrollToOffset({ offset: 0, animated: true });
     }
   };
 
-  const images = activeImages;
+  const handleThumbnailSelect = (index) => {
+    setSelectedImageIndex(index);
+    carouselRef.current?.scrollToIndex({ index, animated: true });
+  };
+
+  const onCarouselScroll = (event) => {
+    const slideSize = event.nativeEvent.layoutMeasurement.width;
+    const index = Math.round(event.nativeEvent.contentOffset.x / slideSize);
+    if (index >= 0 && index !== selectedImageIndex && index < activeImages.length) {
+      setSelectedImageIndex(index);
+    }
+  };
+
+  const images = activeImages.length > 0 ? activeImages : (product?.image ? [product.image] : []);
   const isInWishlist = useWishlistStore((state) => state.isInWishlist(product?.id));
   const toggleWishlist = useWishlistStore((state) => state.toggleWishlist);
   const addItem = useCartStore((state) => state.addItem);
-  const showFeedback = useFeedbackStore((state) => state.showConfirm);
+  const cartItemCount = useCartStore((state) => state.getItemCount());
+  const showConfirm = useFeedbackStore((state) => state.showConfirm);
 
   if (!product) {
     return (
       <View style={styles.container}>
-        <ScreenHeader title="Product Details" onBackPress={() => navigation.goBack()} />
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ fontFamily: FONTS.medium, color: COLORS.textMuted }}>Product not found</Text>
+        <ScreenHeader
+          title="Product Details"
+          showBack={true}
+          onBack={() => navigation.goBack()}
+        />
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading product details...</Text>
         </View>
       </View>
     );
@@ -136,9 +160,9 @@ export const ProductDetailScreen = ({ route, navigation }) => {
         powerType: 'spherical',
         prescriptionMethod: 'manual',
         od: { sph: '-2.00' },
-        os: { sph: '-2.00' }
+        os: { sph: '-2.00' },
       },
-      quantity: 1
+      quantity: 1,
     });
     showConfirm({
       type: 'success',
@@ -146,21 +170,21 @@ export const ProductDetailScreen = ({ route, navigation }) => {
       message: `${product.name} (1 Box · OD -2.00 / OS -2.00) has been added to your shopping bag.`,
       confirmText: 'View Bag',
       cancelText: 'Continue Shopping',
-      onConfirm: () => navigation.navigate('CartTab'),
+      onConfirm: () => navigation.navigate('Main', { screen: 'CartTab' }),
     });
   };
 
   const handleSunglassesAction = async () => {
     await addItem(product, {
       frameColor: selectedColor,
-      image: activeImages[0] || '',
+      image: images[0] || '',
       lensType: 'Polarized UV400 Sun Lens',
       lensPrice: 0,
       sunglass: {
         mode: 'standard',
-        lensType: 'sg-polarized'
+        lensType: 'sg-polarized',
       },
-      quantity: 1
+      quantity: 1,
     });
     showConfirm({
       type: 'success',
@@ -168,14 +192,14 @@ export const ProductDetailScreen = ({ route, navigation }) => {
       message: `${product.name} (${selectedColor} · Polarized) has been added to your shopping bag.`,
       confirmText: 'View Bag',
       cancelText: 'Continue Shopping',
-      onConfirm: () => navigation.navigate('CartTab'),
+      onConfirm: () => navigation.navigate('Main', { screen: 'CartTab' }),
     });
   };
 
   const handleDirectAddFrame = async () => {
     await addItem(product, {
       frameColor: selectedColor,
-      image: activeImages[0] || '',
+      image: images[0] || '',
       lensType: 'Zero Power (Frame Only)',
       lensPrice: 0,
       quantity: 1,
@@ -186,112 +210,185 @@ export const ProductDetailScreen = ({ route, navigation }) => {
       message: `${product.name} (${selectedColor}) has been added to your shopping bag.`,
       confirmText: 'View Bag',
       cancelText: 'Continue Shopping',
-      onConfirm: () => navigation.navigate('CartTab'),
+      onConfirm: () => navigation.navigate('Main', { screen: 'CartTab' }),
     });
   };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.surface} />
+      
+      {/* 1. Compact Header with Back, Wishlist & Bag access */}
       <ScreenHeader
         title={product.brand || 'The Lens Hut'}
+        showBack={true}
         rightAction={
-          <TouchableOpacity
-            onPress={() => toggleWishlist(product)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons
-              name={isInWishlist ? 'heart' : 'heart-outline'}
-              size={24}
-              color={isInWishlist ? COLORS.primary : COLORS.secondary}
-            />
-          </TouchableOpacity>
+          <View style={styles.headerRightActions}>
+            <TouchableOpacity
+              onPress={() => toggleWishlist(product)}
+              style={styles.headerIconBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons
+                name={isInWishlist ? 'heart' : 'heart-outline'}
+                size={23}
+                color={isInWishlist ? '#E11D48' : COLORS.secondary}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Main', { screen: 'CartTab' })}
+              style={[styles.headerIconBtn, { marginLeft: 12 }]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="bag-outline" size={23} color={COLORS.secondary} />
+              {cartItemCount > 0 && (
+                <View style={styles.headerCartBadge}>
+                  <Text style={styles.headerCartBadgeText}>{cartItemCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
         }
       />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 110 + insets.bottom }]}
       >
-        {/* Main Product Image */}
-        <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: images[selectedImageIndex] }}
-            style={styles.mainImage}
-            resizeMode="cover"
+        {/* 2. Swipeable Photography Carousel */}
+        <View style={styles.galleryWrapper}>
+          <FlatList
+            ref={carouselRef}
+            data={images}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={onCarouselScroll}
+            keyExtractor={(_, index) => `img-${index}`}
+            renderItem={({ item }) => (
+              <View style={styles.slideContainer}>
+                <Image
+                  source={{ uri: item }}
+                  style={styles.carouselImage}
+                  resizeMode="contain"
+                />
+              </View>
+            )}
           />
 
-          {discountPercent ? (
-            <View style={styles.discountBadge}>
-              <Text style={styles.discountBadgeText}>{discountPercent}% OFF</Text>
-            </View>
-          ) : null}
+          {/* Badges on Gallery */}
+          <View style={styles.galleryTopBadges}>
+            {discountPercent ? (
+              <View style={styles.discountBadge}>
+                <Text style={styles.discountBadgeText}>{discountPercent}% OFF</Text>
+              </View>
+            ) : <View />}
 
-          {/* Thumbnails row */}
+            <View style={styles.inStockBadge}>
+              <Ionicons name="checkmark-circle" size={13} color="#10B981" style={{ marginRight: 3 }} />
+              <Text style={styles.inStockBadgeText}>In Stock</Text>
+            </View>
+          </View>
+
+          {/* Carousel Page Dots Indicator */}
           {images.length > 1 && (
-            <View style={styles.thumbnailsRow}>
-              {images.map((img, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  activeOpacity={0.8}
-                  style={[
-                    styles.thumbnail,
-                    selectedImageIndex === idx && styles.selectedThumbnail,
-                  ]}
-                  onPress={() => setSelectedImageIndex(idx)}
-                >
-                  <Image source={{ uri: img }} style={styles.thumbImage} />
-                </TouchableOpacity>
-              ))}
+            <View style={styles.indicatorContainer}>
+              <View style={styles.dotsRow}>
+                {images.map((_, idx) => (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.dot,
+                      selectedImageIndex === idx ? styles.activeDot : styles.inactiveDot,
+                    ]}
+                  />
+                ))}
+              </View>
+              <View style={styles.counterBadge}>
+                <Text style={styles.counterBadgeText}>
+                  {selectedImageIndex + 1} / {images.length}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* 3. Interactive Thumbnails Row */}
+          {images.length > 1 && (
+            <View style={styles.thumbnailsContainer}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbnailsScroll}>
+                {images.map((img, idx) => {
+                  const isSelected = selectedImageIndex === idx;
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      activeOpacity={0.8}
+                      style={[styles.thumbnailCard, isSelected && styles.selectedThumbnailCard]}
+                      onPress={() => handleThumbnailSelect(idx)}
+                    >
+                      <Image source={{ uri: img }} style={styles.thumbImage} resizeMode="contain" />
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
             </View>
           )}
         </View>
 
-        {/* Product Details Header */}
-        <View style={styles.detailsCard}>
-          <View style={styles.categoryRatingRow}>
-            <Text style={styles.categoryText}>{product.category}</Text>
+        {/* 4. Product Details Card */}
+        <View style={styles.detailsContainer}>
+          {/* Brand & Category Row */}
+          <View style={styles.brandRow}>
+            <Text style={styles.brandTag}>{product.brand || 'The Lens Hut Collection'}</Text>
             {product.rating ? (
               <View style={styles.ratingBadge}>
-                <Ionicons name="star" size={13} color={COLORS.star} />
-                <Text style={styles.ratingText}>{product.rating}</Text>
-                <Text style={styles.reviewsCountText}>
-                  ({product.reviewsCount || 48} reviews)
-                </Text>
+                <Ionicons name="star" size={13} color="#F59E0B" />
+                <Text style={styles.ratingScore}>{product.rating}</Text>
+                <Text style={styles.reviewCount}>({product.reviewsCount || 48})</Text>
               </View>
             ) : null}
           </View>
 
-          <Text style={styles.productName}>{product.name}</Text>
+          {/* Product Name */}
+          <Text style={styles.productTitle}>{product.name}</Text>
 
-          {/* Price Row */}
+          {/* Price & Tax Row */}
           <View style={styles.priceRow}>
-            <Text style={styles.price}>{formatCurrency(product.price)}</Text>
+            <Text style={styles.currentPrice}>{formatCurrency(product.price)}</Text>
             {product.mrp && product.mrp > product.price ? (
-              <Text style={styles.mrp}>{formatCurrency(product.mrp)}</Text>
+              <Text style={styles.originalMrp}>{formatCurrency(product.mrp)}</Text>
             ) : null}
-            <Text style={styles.taxInfo}>inclusive of all taxes</Text>
+            {discountPercent ? (
+              <View style={styles.saveBadge}>
+                <Text style={styles.saveBadgeText}>Save {formatCurrency(product.mrp - product.price)}</Text>
+              </View>
+            ) : null}
           </View>
+          <Text style={styles.taxNote}>Inclusive of all taxes · Free standard delivery</Text>
 
-          {/* Color Selection */}
+          {/* 5. Color Choices as Visual Swatches */}
           {product.colors && product.colors.length > 0 && (
-            <View style={styles.optionSection}>
-              <Text style={styles.optionLabel}>
-                Frame Color: <Text style={styles.selectedOptionValue}>{selectedColor}</Text>
-              </Text>
-              <View style={styles.colorSwatchesRow}>
+            <View style={styles.sectionDivider}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>
+                  Frame Color: <Text style={styles.sectionValueBold}>{selectedColor}</Text>
+                </Text>
+                <Text style={styles.colorCount}>{product.colors.length} choices</Text>
+              </View>
+              <View style={styles.swatchesRow}>
                 {product.colors.map((c) => {
                   const isSelected = selectedColor === c.name;
                   return (
                     <TouchableOpacity
                       key={c.name}
                       onPress={() => handleColorSelect(c)}
+                      activeOpacity={0.7}
                       style={[
-                        styles.colorSwatchRing,
-                        isSelected && styles.selectedColorSwatchRing,
+                        styles.swatchOuterRing,
+                        isSelected && styles.selectedSwatchOuterRing,
                       ]}
                     >
-                      <View style={[styles.colorSwatchDot, { backgroundColor: c.hex }]} />
+                      <View style={[styles.swatchColorDot, { backgroundColor: c.hex }]} />
                     </TouchableOpacity>
                   );
                 })}
@@ -299,92 +396,132 @@ export const ProductDetailScreen = ({ route, navigation }) => {
             </View>
           )}
 
-          {/* Frame Specifications */}
-          <View style={styles.specsSection}>
-            <Text style={styles.sectionHeading}>Frame Specifications</Text>
+          {/* 6. Frame Specifications Grid */}
+          <View style={styles.sectionDivider}>
+            <Text style={styles.sectionTitle}>Frame Specifications</Text>
             <View style={styles.specsGrid}>
-              <View style={styles.specItem}>
-                <Text style={styles.specLabel}>Frame Shape</Text>
-                <Text style={styles.specValue}>{product.frameShape || 'Geometric'}</Text>
+              <View style={styles.specBox}>
+                <Text style={styles.specKey}>Shape</Text>
+                <Text style={styles.specVal}>{product.frameShape || 'Square'}</Text>
               </View>
-              <View style={styles.specItem}>
-                <Text style={styles.specLabel}>Rim Type</Text>
-                <Text style={styles.specValue}>{product.frameType || 'Full Rim'}</Text>
+              <View style={styles.specBox}>
+                <Text style={styles.specKey}>Rim Type</Text>
+                <Text style={styles.specVal}>{product.frameType || 'Full Rim'}</Text>
               </View>
-              <View style={styles.specItem}>
-                <Text style={styles.specLabel}>Material</Text>
-                <Text style={styles.specValue}>{product.material || 'Acetate'}</Text>
+              <View style={styles.specBox}>
+                <Text style={styles.specKey}>Material</Text>
+                <Text style={styles.specVal}>{product.material || 'Acetate'}</Text>
               </View>
-              <View style={styles.specItem}>
-                <Text style={styles.specLabel}>Size</Text>
-                <Text style={styles.specValue}>{product.size || 'Medium (52-18-140)'}</Text>
+              <View style={styles.specBox}>
+                <Text style={styles.specKey}>Size</Text>
+                <Text style={styles.specVal}>{product.size || 'Medium (52-18)'}</Text>
               </View>
               {product.weight && (
-                <View style={styles.specItem}>
-                  <Text style={styles.specLabel}>Frame Weight</Text>
-                  <Text style={styles.specValue}>{product.weight}</Text>
+                <View style={styles.specBox}>
+                  <Text style={styles.specKey}>Weight</Text>
+                  <Text style={styles.specVal}>{product.weight}</Text>
                 </View>
               )}
+              <View style={styles.specBox}>
+                <Text style={styles.specKey}>Gender</Text>
+                <Text style={styles.specVal}>{product.gender || 'Unisex'}</Text>
+              </View>
             </View>
           </View>
 
-          {/* Description */}
+          {/* 7. Product Description */}
           {product.description ? (
-            <View style={styles.descriptionSection}>
-              <Text style={styles.sectionHeading}>About this Frame</Text>
-              <Text style={styles.descriptionText}>{product.description}</Text>
+            <View style={styles.sectionDivider}>
+              <Text style={styles.sectionTitle}>Craft & Design</Text>
+              <Text style={styles.descriptionParagraph}>{product.description}</Text>
             </View>
           ) : null}
 
-          {/* Guarantees Box */}
-          <View style={styles.guaranteesBox}>
-            <View style={styles.guaranteeItem}>
-              <Ionicons name="checkmark-done-circle-outline" size={20} color={COLORS.primary} />
-              <Text style={styles.guaranteeText}>1-Year Warranty on Frame</Text>
+          {/* 8. Assurance & Guarantees Box */}
+          <View style={styles.assuranceCard}>
+            <View style={styles.assuranceItem}>
+              <View style={styles.assuranceIconCircle}>
+                <Ionicons name="shield-checkmark" size={17} color={COLORS.primary} />
+              </View>
+              <View style={styles.assuranceTextCol}>
+                <Text style={styles.assuranceTitle}>1-Year Warranty</Text>
+                <Text style={styles.assuranceSub}>Free replacement for manufacturing defects</Text>
+              </View>
             </View>
-            <View style={styles.guaranteeItem}>
-              <Ionicons name="swap-horizontal-outline" size={20} color={COLORS.primary} />
-              <Text style={styles.guaranteeText}>7 Days Hassle-Free Exchange</Text>
+
+            <View style={styles.assuranceDivider} />
+
+            <View style={styles.assuranceItem}>
+              <View style={styles.assuranceIconCircle}>
+                <Ionicons name="swap-horizontal" size={17} color={COLORS.primary} />
+              </View>
+              <View style={styles.assuranceTextCol}>
+                <Text style={styles.assuranceTitle}>7 Days Easy Return / Exchange</Text>
+                <Text style={styles.assuranceSub}>No questions asked doorstep pickup</Text>
+              </View>
             </View>
-            <View style={styles.guaranteeItem}>
-              <Ionicons name="shield-checkmark-outline" size={20} color={COLORS.primary} />
-              <Text style={styles.guaranteeText}>Authentic Certified Optics</Text>
+
+            <View style={styles.assuranceDivider} />
+
+            <View style={styles.assuranceItem}>
+              <View style={styles.assuranceIconCircle}>
+                <Ionicons name="ribbon-outline" size={17} color={COLORS.primary} />
+              </View>
+              <View style={styles.assuranceTextCol}>
+                <Text style={styles.assuranceTitle}>100% Certified Authentic</Text>
+                <Text style={styles.assuranceSub}>Original branded frames & precision optics</Text>
+              </View>
             </View>
           </View>
         </View>
       </ScrollView>
 
-      {/* Bottom Action Bar */}
-      <View style={styles.bottomBar}>
-        {pType === 'eyeglasses' && (
-          <TouchableOpacity
-            style={styles.frameOnlyBtn}
-            onPress={handleDirectAddFrame}
-          >
-            <Text style={styles.frameOnlyBtnText}>Frame Only</Text>
-          </TouchableOpacity>
-        )}
+      {/* 9. Persistent Bottom Action Area */}
+      <View style={[styles.bottomActionBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        <View style={styles.bottomPriceCol}>
+          <Text style={styles.bottomPriceLabel}>Total Amount</Text>
+          <Text style={styles.bottomPriceValue}>{formatCurrency(product.price)}</Text>
+        </View>
 
-        <Button
-          title={
-            pType === 'contact-lens'
-              ? 'Add Contact Lenses to Bag'
-              : pType === 'sunglasses'
-              ? 'Add Sunglasses to Bag'
-              : 'Select Lenses & Buy'
-          }
-          onPress={
-            pType === 'contact-lens'
-              ? handleContactLensAction
-              : pType === 'sunglasses'
-              ? handleSunglassesAction
-              : handleSelectLenses
-          }
-          variant="primary"
-          size="lg"
-          rightIcon={<Ionicons name="arrow-forward" size={18} color={COLORS.surface} />}
-          style={pType === 'eyeglasses' ? styles.selectLensesBtn : { flex: 1 }}
-        />
+        <View style={styles.bottomButtonsCol}>
+          {pType === 'eyeglasses' ? (
+            <View style={styles.dualActionsRow}>
+              <TouchableOpacity
+                style={styles.frameOnlyButton}
+                activeOpacity={0.8}
+                onPress={handleDirectAddFrame}
+              >
+                <Text style={styles.frameOnlyButtonText}>Frame Only</Text>
+              </TouchableOpacity>
+
+              <Button
+                title="Select Lenses & Buy"
+                onPress={handleSelectLenses}
+                variant="primary"
+                size="md"
+                rightIcon={<Ionicons name="arrow-forward" size={16} color={COLORS.surface} />}
+                style={styles.selectLensesButton}
+              />
+            </View>
+          ) : (
+            <Button
+              title={
+                pType === 'contact-lens'
+                  ? 'Add to Bag'
+                  : 'Add Sunglasses to Bag'
+              }
+              onPress={
+                pType === 'contact-lens'
+                  ? handleContactLensAction
+                  : handleSunglassesAction
+              }
+              variant="primary"
+              size="lg"
+              rightIcon={<Ionicons name="bag-check" size={18} color={COLORS.surface} />}
+              style={styles.fullWidthActionButton}
+            />
+          )}
+        </View>
       </View>
     </View>
   );
@@ -395,142 +532,279 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontFamily: FONTS.medium,
+    color: COLORS.textMuted,
+    fontSize: 14,
+  },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
-  imageContainer: {
-    width: '100%',
-    backgroundColor: '#F8F9FA',
+  // Header Actions
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerIconBtn: {
+    padding: 4,
     position: 'relative',
-    paddingBottom: 16,
   },
-  mainImage: {
+  headerCartBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -6,
+    backgroundColor: COLORS.primary,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  headerCartBadgeText: {
+    color: COLORS.surface,
+    fontFamily: FONTS.bold,
+    fontSize: 10,
+  },
+  // Gallery & Carousel
+  galleryWrapper: {
+    backgroundColor: '#F8FAFC',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    position: 'relative',
+    paddingBottom: 12,
+  },
+  slideContainer: {
+    width: SCREEN_WIDTH,
+    height: 290,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  carouselImage: {
     width: '100%',
-    height: 280,
+    height: '100%',
+  },
+  galleryTopBadges: {
+    position: 'absolute',
+    top: 14,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   discountBadge: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 8,
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 9,
     paddingVertical: 4,
-    borderRadius: LAYOUT.radius.xs,
+    borderRadius: 6,
   },
   discountBadgeText: {
     fontFamily: FONTS.bold,
     fontSize: 11,
     color: COLORS.surface,
   },
-  thumbnailsRow: {
+  inStockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  inStockBadgeText: {
+    fontFamily: FONTS.medium,
+    fontSize: 11,
+    color: '#065F46',
+  },
+  indicatorContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 6,
+    paddingHorizontal: 16,
+    position: 'relative',
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dot: {
+    height: 5,
+    borderRadius: 3,
+    marginHorizontal: 3,
+  },
+  activeDot: {
+    width: 20,
+    backgroundColor: COLORS.secondary,
+  },
+  inactiveDot: {
+    width: 6,
+    backgroundColor: '#CBD5E1',
+  },
+  counterBadge: {
+    position: 'absolute',
+    right: 16,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  counterBadgeText: {
+    fontFamily: FONTS.medium,
+    fontSize: 10.5,
+    color: COLORS.surface,
+  },
+  // Thumbnails
+  thumbnailsContainer: {
     marginTop: 12,
   },
-  thumbnail: {
-    width: 50,
-    height: 50,
-    borderRadius: LAYOUT.radius.sm,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
-    marginHorizontal: 6,
-    overflow: 'hidden',
+  thumbnailsScroll: {
+    paddingHorizontal: 16,
+    justifyContent: 'center',
   },
-  selectedThumbnail: {
+  thumbnailCard: {
+    width: 54,
+    height: 54,
+    borderRadius: 8,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    marginRight: 8,
+    padding: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedThumbnailCard: {
     borderColor: COLORS.primary,
+    backgroundColor: '#F0F9FF',
   },
   thumbImage: {
     width: '100%',
     height: '100%',
   },
-  detailsCard: {
+  // Details Card
+  detailsContainer: {
     backgroundColor: COLORS.surface,
-    padding: 20,
-    borderTopLeftRadius: LAYOUT.radius.xl,
-    borderTopRightRadius: LAYOUT.radius.xl,
-    marginTop: -16,
-    ...LAYOUT.shadows.sm,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 24,
   },
-  categoryRatingRow: {
+  brandRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 6,
   },
-  categoryText: {
+  brandTag: {
     fontFamily: FONTS.semiBold,
     fontSize: 12,
-    color: COLORS.textMuted,
+    color: COLORS.primary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
   ratingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.borderLight,
-    paddingHorizontal: 8,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: LAYOUT.radius.xs,
+    borderRadius: 6,
   },
-  ratingText: {
+  ratingScore: {
     fontFamily: FONTS.bold,
     fontSize: 12,
-    color: COLORS.secondary,
-    marginLeft: 4,
+    color: '#92400E',
+    marginLeft: 3,
   },
-  reviewsCountText: {
+  reviewCount: {
     fontFamily: FONTS.regular,
     fontSize: 11,
-    color: COLORS.textMuted,
-    marginLeft: 4,
+    color: '#B45309',
+    marginLeft: 2,
   },
-  productName: {
+  productTitle: {
     fontFamily: FONTS.bold,
-    fontSize: 22,
+    fontSize: 21,
     color: COLORS.secondary,
-    marginBottom: 8,
+    lineHeight: 28,
+    marginBottom: 10,
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginBottom: 20,
+    marginBottom: 2,
   },
-  price: {
+  currentPrice: {
     fontFamily: FONTS.extraBold,
-    fontSize: 22,
+    fontSize: 24,
     color: COLORS.secondary,
   },
-  mrp: {
+  originalMrp: {
     fontFamily: FONTS.regular,
     fontSize: 15,
     color: COLORS.textMuted,
     textDecorationLine: 'line-through',
-    marginLeft: 8,
+    marginLeft: 10,
   },
-  taxInfo: {
-    fontFamily: FONTS.regular,
+  saveBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 10,
+  },
+  saveBadgeText: {
+    fontFamily: FONTS.semiBold,
     fontSize: 11,
+    color: '#15803D',
+  },
+  taxNote: {
+    fontFamily: FONTS.regular,
+    fontSize: 12,
     color: COLORS.textMuted,
-    marginLeft: 8,
+    marginBottom: 16,
   },
-  optionSection: {
-    marginBottom: 20,
+  sectionDivider: {
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    marginBottom: 16,
   },
-  optionLabel: {
-    fontFamily: FONTS.medium,
-    fontSize: 13,
-    color: COLORS.textSecondary,
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 10,
   },
-  selectedOptionValue: {
-    fontFamily: FONTS.bold,
+  sectionTitle: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 14.5,
     color: COLORS.secondary,
   },
-  colorSwatchesRow: {
+  sectionValueBold: {
+    fontFamily: FONTS.bold,
+    color: COLORS.primary,
+  },
+  colorCount: {
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: COLORS.textMuted,
+  },
+  swatchesRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  colorSwatchRing: {
+  swatchOuterRing: {
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -540,104 +814,166 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 10,
   },
-  selectedColorSwatchRing: {
+  selectedSwatchOuterRing: {
     borderColor: COLORS.primary,
   },
-  colorSwatchDot: {
+  swatchColorDot: {
     width: 24,
     height: 24,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.1)',
   },
-  specsSection: {
-    marginBottom: 20,
-  },
-  sectionHeading: {
-    fontFamily: FONTS.bold,
-    fontSize: 15,
-    color: COLORS.secondary,
-    marginBottom: 12,
-  },
+  // Specs Grid
   specsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    backgroundColor: COLORS.borderLight,
-    borderRadius: LAYOUT.radius.md,
-    padding: 12,
+    marginTop: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
-  specItem: {
-    width: '50%',
-    paddingVertical: 6,
+  specBox: {
+    width: '33.33%',
+    paddingVertical: 8,
+    paddingHorizontal: 6,
   },
-  specLabel: {
+  specKey: {
     fontFamily: FONTS.regular,
     fontSize: 11,
     color: COLORS.textMuted,
+    textTransform: 'uppercase',
   },
-  specValue: {
+  specVal: {
     fontFamily: FONTS.semiBold,
     fontSize: 13,
     color: COLORS.secondary,
     marginTop: 2,
   },
-  descriptionSection: {
-    marginBottom: 20,
-  },
-  descriptionText: {
+  descriptionParagraph: {
     fontFamily: FONTS.regular,
-    fontSize: 14,
+    fontSize: 13.5,
     color: COLORS.textSecondary,
     lineHeight: 22,
+    marginTop: 8,
   },
-  guaranteesBox: {
-    backgroundColor: COLORS.primaryUltraLight,
+  // Assurance Card
+  assuranceCard: {
+    backgroundColor: '#F0F9FF',
+    borderRadius: 14,
     padding: 14,
-    borderRadius: LAYOUT.radius.md,
     borderWidth: 1,
-    borderColor: COLORS.primaryLight,
+    borderColor: '#BAE6FD',
+    marginTop: 8,
   },
-  guaranteeItem: {
+  assuranceItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 4,
+    paddingVertical: 6,
   },
-  guaranteeText: {
-    fontFamily: FONTS.medium,
-    fontSize: 12,
-    color: COLORS.secondary,
-    marginLeft: 8,
-  },
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 76,
+  assuranceIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: COLORS.surface,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.borderLight,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    ...LAYOUT.shadows.lg,
-  },
-  frameOnlyBtn: {
-    height: 48,
-    paddingHorizontal: 16,
-    borderRadius: LAYOUT.radius.md,
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#E0F2FE',
   },
-  frameOnlyBtnText: {
+  assuranceTextCol: {
+    flex: 1,
+  },
+  assuranceTitle: {
     fontFamily: FONTS.semiBold,
     fontSize: 13,
     color: COLORS.secondary,
   },
-  selectLensesBtn: {
+  assuranceSub: {
+    fontFamily: FONTS.regular,
+    fontSize: 11.5,
+    color: COLORS.textMuted,
+    marginTop: 1,
+  },
+  assuranceDivider: {
+    height: 1,
+    backgroundColor: '#E0F2FE',
+    marginVertical: 4,
+  },
+  // Persistent Bottom Action Bar
+  bottomActionBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.surface,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+  bottomPriceCol: {
+    marginRight: 14,
+  },
+  bottomPriceLabel: {
+    fontFamily: FONTS.regular,
+    fontSize: 10.5,
+    color: COLORS.textMuted,
+    textTransform: 'uppercase',
+  },
+  bottomPriceValue: {
+    fontFamily: FONTS.extraBold,
+    fontSize: 19,
+    color: COLORS.secondary,
+  },
+  bottomButtonsCol: {
     flex: 1,
+  },
+  dualActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  frameOnlyButton: {
+    height: 44,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    backgroundColor: '#F8FAFC',
+  },
+  frameOnlyButtonText: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 12.5,
+    color: COLORS.secondary,
+  },
+  selectLensesButton: {
+    flex: 1,
+    height: 44,
+  },
+  fullWidthActionButton: {
+    flex: 1,
+    height: 46,
   },
 });
 
 export default ProductDetailScreen;
+

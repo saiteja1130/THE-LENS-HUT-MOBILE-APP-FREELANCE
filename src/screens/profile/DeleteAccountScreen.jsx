@@ -56,7 +56,7 @@ export const DeleteAccountScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.surface} />
-      <ScreenHeader title="Delete Account" />
+      <ScreenHeader title="Delete Account" showBack={true} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Modal,
   StatusBar,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import COLORS from '../../constants/colors';
@@ -24,21 +25,39 @@ const SORT_OPTIONS = [
   { id: 'featured', label: 'Featured & Popular' },
   { id: 'price_asc', label: 'Price: Low to High' },
   { id: 'price_desc', label: 'Price: High to Low' },
-  { id: 'rating', label: 'Customer Rating' },
+  { id: 'rating', label: 'Highest Customer Rating' },
 ];
 
 const SHAPE_OPTIONS = ['All', 'Aviator', 'Square', 'Cat-Eye', 'Round', 'Wayfarer'];
 
 export const ShopScreen = ({ route, navigation }) => {
   const initialCategory = route?.params?.category || 'all';
+  const searchInputRef = useRef(null);
   const [products, setProducts] = useState([]);
   const [categoriesList, setCategoriesList] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(route?.params?.search || route?.params?.searchQuery || '');
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const [selectedShape, setSelectedShape] = useState('All');
   const [selectedSort, setSelectedSort] = useState('featured');
   const [isSortModalVisible, setIsSortModalVisible] = useState(false);
+
+  // Sync category and search focus when navigation params change
+  useEffect(() => {
+    if (route?.params?.category !== undefined) {
+      setSelectedCategory(route.params.category || 'all');
+    }
+    if (route?.params?.search !== undefined || route?.params?.searchQuery !== undefined) {
+      setSearchQuery(route.params.search || route.params.searchQuery || '');
+    }
+    if (route?.params?.focusSearch) {
+      const timer = setTimeout(() => {
+        searchInputRef.current?.focus();
+        navigation.setParams({ focusSearch: undefined });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [route?.params?.category, route?.params?.search, route?.params?.searchQuery, route?.params?.focusSearch, navigation]);
 
   const loadData = useCallback(async () => {
     try {
@@ -53,7 +72,7 @@ export const ShopScreen = ({ route, navigation }) => {
         setCategoriesList(catRes.data);
       }
     } catch {
-      // ignore
+      // Keep existing products on network error
     }
   }, []);
 
@@ -68,7 +87,7 @@ export const ShopScreen = ({ route, navigation }) => {
   };
 
   const categories = useMemo(
-    () => [{ id: 'all', name: 'All Products', slug: 'all' }, ...categoriesList],
+    () => [{ id: 'all', name: 'All Frames', slug: 'all' }, ...categoriesList],
     [categoriesList]
   );
 
@@ -111,7 +130,15 @@ export const ShopScreen = ({ route, navigation }) => {
     }
 
     return list;
-  }, [selectedCategory, selectedShape, searchQuery, selectedSort]);
+  }, [products, selectedCategory, selectedShape, searchQuery, selectedSort]);
+
+  const resetAllFilters = () => {
+    setSelectedCategory('all');
+    setSelectedShape('All');
+    setSearchQuery('');
+  };
+
+  const hasActiveFilters = selectedCategory !== 'all' || selectedShape !== 'All' || searchQuery.trim().length > 0;
 
   const renderProductItem = ({ item }) => (
     <View style={styles.productColumn}>
@@ -125,37 +152,39 @@ export const ShopScreen = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.surface} />
+      
+      {/* 1. Top Bar with Logo, Wishlist & Bag */}
       <ScreenHeader showLogo={true} showWishlist={true} showCart={true} />
 
-      {/* Search Header */}
-      <View style={styles.searchHeader}>
-        <View style={styles.searchInputWrapper}>
-          <Ionicons name="search-outline" size={20} color={COLORS.textMuted} />
+      {/* 2. Prominent Search Bar */}
+      <View style={styles.searchSection}>
+        <View style={styles.searchInputContainer}>
+          <Ionicons name="search-outline" size={19} color={COLORS.textMuted} style={styles.searchIcon} />
           <TextInput
+            ref={searchInputRef}
             style={styles.searchInput}
             placeholder="Search frames, brands, styles..."
             placeholderTextColor={COLORS.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoFocus={route?.params?.focusSearch || false}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
           />
-          {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              style={styles.clearSearchBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
               <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
             </TouchableOpacity>
-          ) : null}
+          )}
         </View>
-
-        <TouchableOpacity
-          style={styles.sortTriggerBtn}
-          onPress={() => setIsSortModalVisible(true)}
-        >
-          <Ionicons name="swap-vertical-outline" size={20} color={COLORS.secondary} />
-        </TouchableOpacity>
       </View>
 
-      {/* Category Horizontal Pills */}
-      <View style={styles.categoryBar}>
+      {/* 3. Horizontal Scrollable Category Chips */}
+      <View style={styles.filterSection}>
         <FlatList
           data={categories}
           horizontal
@@ -167,21 +196,18 @@ export const ShopScreen = ({ route, navigation }) => {
             return (
               <TouchableOpacity
                 onPress={() => setSelectedCategory(item.slug)}
+                activeOpacity={0.7}
                 style={[styles.categoryChip, isSelected && styles.selectedCategoryChip]}
               >
-                <Text
-                  style={[styles.categoryChipText, isSelected && styles.selectedCategoryChipText]}
-                >
+                <Text style={[styles.categoryChipText, isSelected && styles.selectedCategoryChipText]}>
                   {item.name}
                 </Text>
               </TouchableOpacity>
             );
           }}
         />
-      </View>
 
-      {/* Frame Shape Filter Sub-bar */}
-      <View style={styles.shapeBar}>
+        {/* 4. Horizontal Scrollable Frame Shape Chips */}
         <FlatList
           data={SHAPE_OPTIONS}
           horizontal
@@ -193,6 +219,7 @@ export const ShopScreen = ({ route, navigation }) => {
             return (
               <TouchableOpacity
                 onPress={() => setSelectedShape(item)}
+                activeOpacity={0.7}
                 style={[styles.shapeChip, isSelected && styles.selectedShapeChip]}
               >
                 <Text style={[styles.shapeChipText, isSelected && styles.selectedShapeChipText]}>
@@ -204,30 +231,45 @@ export const ShopScreen = ({ route, navigation }) => {
         />
       </View>
 
-      {/* Counter Row */}
-      <View style={styles.resultsInfoRow}>
-        <Text style={styles.resultsCountText}>
-          Showing <Text style={styles.boldText}>{filteredProducts.length}</Text> items
-        </Text>
+      {/* 5. Compact Result Count and Sort Bar */}
+      <View style={styles.metaRow}>
+        <View style={styles.countWrapper}>
+          <Text style={styles.resultsCountText}>
+            Showing <Text style={styles.resultsCountBold}>{filteredProducts.length}</Text>{' '}
+            {filteredProducts.length === 1 ? 'frame' : 'frames'}
+          </Text>
+          {hasActiveFilters && (
+            <TouchableOpacity onPress={resetAllFilters} style={styles.inlineResetBtn}>
+              <Text style={styles.inlineResetText}>Clear</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         <TouchableOpacity
           onPress={() => setIsSortModalVisible(true)}
-          style={styles.activeSortDisplay}
+          activeOpacity={0.7}
+          style={styles.sortTriggerPill}
         >
-          <Text style={styles.activeSortText}>
+          <Ionicons name="swap-vertical" size={14} color={COLORS.secondary} style={{ marginRight: 4 }} />
+          <Text style={styles.sortTriggerLabel}>
             {SORT_OPTIONS.find((s) => s.id === selectedSort)?.label}
           </Text>
-          <Ionicons name="chevron-down" size={14} color={COLORS.secondary} />
+          <Ionicons name="chevron-down" size={12} color={COLORS.secondary} style={{ marginLeft: 2 }} />
         </TouchableOpacity>
       </View>
 
-      {/* Products Grid */}
+      {/* 6. Product Grid */}
       <FlatList
         data={filteredProducts}
         renderItem={renderProductItem}
         keyExtractor={(item) => item.id}
         numColumns={2}
+        columnWrapperStyle={styles.productRow}
         contentContainerStyle={styles.productList}
         showsVerticalScrollIndicator={false}
+        initialNumToRender={6}
+        maxToRenderPerBatch={8}
+        windowSize={5}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -237,21 +279,19 @@ export const ShopScreen = ({ route, navigation }) => {
           />
         }
         ListEmptyComponent={
-          <EmptyState
-            iconName="search-outline"
-            title="No matching frames found"
-            description="Try changing the category, removing filters, or searching with different keywords."
-            actionTitle="Reset Filters"
-            onActionPress={() => {
-              setSelectedCategory('all');
-              setSelectedShape('All');
-              setSearchQuery('');
-            }}
-          />
+          <View style={styles.emptyContainer}>
+            <EmptyState
+              iconName="search-outline"
+              title="No matching frames found"
+              description="Try adjusting your search keywords, switching categories, or resetting the shape filters."
+              actionTitle="Reset All Filters"
+              onActionPress={resetAllFilters}
+            />
+          </View>
         }
       />
 
-      {/* Sort Modal (Using standard React Native Modal per user requirement) */}
+      {/* 7. Bottom Sheet Sort Modal */}
       <Modal
         visible={isSortModalVisible}
         transparent
@@ -264,9 +304,13 @@ export const ShopScreen = ({ route, navigation }) => {
           onPress={() => setIsSortModalVisible(false)}
         >
           <View style={styles.modalContent}>
+            <View style={styles.modalGrabber} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Sort By</Text>
-              <TouchableOpacity onPress={() => setIsSortModalVisible(false)}>
+              <TouchableOpacity
+                onPress={() => setIsSortModalVisible(false)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
                 <Ionicons name="close" size={22} color={COLORS.secondary} />
               </TouchableOpacity>
             </View>
@@ -276,7 +320,7 @@ export const ShopScreen = ({ route, navigation }) => {
               return (
                 <TouchableOpacity
                   key={option.id}
-                  style={styles.sortOptionItem}
+                  style={[styles.sortOptionItem, isSelected && styles.selectedSortOptionItem]}
                   onPress={() => {
                     setSelectedSort(option.id);
                     setIsSortModalVisible(false);
@@ -303,152 +347,218 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  searchHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  // Search section
+  searchSection: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingTop: 8,
+    paddingBottom: 10,
     backgroundColor: COLORS.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.borderLight,
   },
-  searchInputWrapper: {
-    flex: 1,
+  searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.borderLight,
-    height: 42,
-    borderRadius: LAYOUT.radius.md,
-    paddingHorizontal: 12,
+    backgroundColor: '#F1F5F9',
+    height: 44,
+    borderRadius: 22,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  searchIcon: {
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
     fontFamily: FONTS.regular,
     fontSize: 14,
     color: COLORS.textPrimary,
-    marginLeft: 8,
-    padding: 0,
+    paddingVertical: 0,
   },
-  sortTriggerBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: LAYOUT.radius.md,
-    backgroundColor: COLORS.borderLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 10,
+  clearSearchBtn: {
+    padding: 4,
+    marginLeft: 4,
   },
-  categoryBar: {
+  // Filter bar
+  filterSection: {
     backgroundColor: COLORS.surface,
-    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderLight,
+    paddingBottom: 8,
   },
   categoryScroll: {
     paddingHorizontal: 16,
+    paddingVertical: 4,
   },
   categoryChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: LAYOUT.radius.round,
-    backgroundColor: COLORS.borderLight,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     marginRight: 8,
   },
   selectedCategoryChip: {
     backgroundColor: COLORS.secondary,
+    borderColor: COLORS.secondary,
+    ...Platform.select({
+      ios: {
+        shadowColor: COLORS.secondary,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 3,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   categoryChipText: {
     fontFamily: FONTS.medium,
-    fontSize: 12,
+    fontSize: 12.5,
     color: COLORS.textSecondary,
   },
   selectedCategoryChipText: {
     color: COLORS.surface,
-  },
-  shapeBar: {
-    backgroundColor: COLORS.surface,
-    paddingVertical: 6,
+    fontFamily: FONTS.semiBold,
   },
   shapeScroll: {
     paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 2,
   },
   shapeChip: {
     paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: LAYOUT.radius.xs,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: 'transparent',
     marginRight: 6,
   },
   selectedShapeChip: {
+    backgroundColor: '#E6F0FA',
     borderColor: COLORS.primary,
-    backgroundColor: COLORS.primaryLight,
   },
   shapeChipText: {
     fontFamily: FONTS.regular,
-    fontSize: 11,
-    color: COLORS.textSecondary,
+    fontSize: 11.5,
+    color: COLORS.textMuted,
   },
   selectedShapeChipText: {
     color: COLORS.primary,
     fontFamily: FONTS.semiBold,
   },
-  resultsInfoRow: {
+  // Meta count & sort bar
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 10,
+    backgroundColor: COLORS.background,
   },
-  resultsCountText: {
-    fontFamily: FONTS.regular,
-    fontSize: 12,
-    color: COLORS.textMuted,
-  },
-  boldText: {
-    fontFamily: FONTS.semiBold,
-    color: COLORS.secondary,
-  },
-  activeSortDisplay: {
+  countWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  activeSortText: {
+  resultsCountText: {
+    fontFamily: FONTS.regular,
+    fontSize: 12.5,
+    color: COLORS.textMuted,
+  },
+  resultsCountBold: {
+    fontFamily: FONTS.semiBold,
+    color: COLORS.secondary,
+  },
+  inlineResetBtn: {
+    marginLeft: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: '#E2E8F0',
+  },
+  inlineResetText: {
+    fontFamily: FONTS.medium,
+    fontSize: 11,
+    color: COLORS.secondary,
+  },
+  sortTriggerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+  },
+  sortTriggerLabel: {
     fontFamily: FONTS.medium,
     fontSize: 12,
     color: COLORS.secondary,
-    marginRight: 4,
   },
+  // Product Grid
   productList: {
     paddingHorizontal: 10,
-    paddingBottom: 40,
+    paddingTop: 4,
+    paddingBottom: 32,
+  },
+  productRow: {
+    justifyContent: 'space-between',
   },
   productColumn: {
     width: '50%',
     padding: 6,
   },
-  // Modal styles
+  emptyContainer: {
+    paddingTop: 40,
+    paddingHorizontal: 20,
+  },
+  // Sort Bottom Sheet Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: COLORS.surface,
-    borderTopLeftRadius: LAYOUT.radius.lg,
-    borderTopRightRadius: LAYOUT.radius.lg,
-    padding: 20,
-    paddingBottom: 36,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 12,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -3 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+  modalGrabber: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+    alignSelf: 'center',
+    marginBottom: 12,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderLight,
   },
   modalTitle: {
     fontFamily: FONTS.bold,
-    fontSize: 18,
+    fontSize: 17,
     color: COLORS.secondary,
   },
   sortOptionItem: {
@@ -459,9 +569,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderLight,
   },
+  selectedSortOptionItem: {
+    backgroundColor: '#F8FAFC',
+  },
   sortOptionText: {
     fontFamily: FONTS.medium,
-    fontSize: 15,
+    fontSize: 14.5,
     color: COLORS.textPrimary,
   },
   selectedSortOptionText: {
@@ -471,3 +584,4 @@ const styles = StyleSheet.create({
 });
 
 export default ShopScreen;
+

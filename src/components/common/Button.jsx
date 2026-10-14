@@ -47,7 +47,13 @@ export const Button = ({
     if (variant === 'ghost') base.push(styles.ghostText);
     if (variant === 'danger') base.push(styles.dangerText);
 
-    if (disabled) base.push(styles.disabledText);
+    if (disabled) {
+      if (variant === 'outline' || variant === 'ghost') {
+        base.push(styles.disabledText);
+      } else {
+        base.push(styles.disabledSolidText);
+      }
+    }
     if (textStyle) base.push(textStyle);
 
     return base;
@@ -162,6 +168,10 @@ const styles = StyleSheet.create({
   },
   disabledText: {
     color: COLORS.textMuted,
+  },
+  disabledSolidText: {
+    color: '#FFFFFF',
+    opacity: 0.85,
   },
 });
 

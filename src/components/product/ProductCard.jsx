@@ -13,6 +13,7 @@ import LAYOUT from '../../constants/layout';
 import formatCurrency from '../../utils/formatCurrency';
 import useWishlistStore from '../../store/wishlistStore';
 
+export const ProductCard = ({ product, onPress, style }) => {
   const getProductImage = (p) => {
     return p?.images?.front || (Array.isArray(p?.images) ? p?.images[0] : null) || p?.image || '';
   };

@@ -55,7 +55,7 @@ export const ContactUsScreen = ({ route }) => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.surface} />
-      <ScreenHeader title="Contact Support" />
+      <ScreenHeader title="Contact Support" showBack={true} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

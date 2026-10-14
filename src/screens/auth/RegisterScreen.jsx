@@ -98,9 +98,12 @@ export const RegisterScreen = ({ navigation }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
+        bounces={false}
       >
         <View style={styles.topSection}>
           <TouchableOpacity
@@ -210,12 +213,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.surface,
   },
+  scrollView: {
+    flex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 20,
-    paddingBottom: 32,
-    justifyContent: 'space-between',
+    paddingBottom: 40,
   },
   topSection: {
     marginBottom: 20,
@@ -242,7 +247,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   formSection: {
-    flex: 1,
+    marginBottom: 20,
   },
   registerButton: {
     marginTop: 8,
@@ -252,7 +257,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 16,
+    paddingTop: 16,
+    paddingBottom: 20,
+    marginTop: 'auto',
   },
   footerText: {
     fontFamily: FONTS.regular,

@@ -15,6 +15,7 @@ export const ScreenHeader = ({
   showLogo = false,
   showBack = false,
   onBack,
+  onBackPress,
   showSearch = false,
   showWishlist = false,
   showCart = false,
@@ -26,8 +27,9 @@ export const ScreenHeader = ({
   const wishlistCount = useWishlistStore((state) => state.items.length);
 
   const handleBack = () => {
-    if (onBack) {
-      onBack();
+    const backFn = onBack || onBackPress;
+    if (backFn) {
+      backFn();
     } else if (navigation.canGoBack()) {
       navigation.goBack();
     }
@@ -46,14 +48,14 @@ export const ScreenHeader = ({
             <Ionicons name="arrow-back" size={24} color={COLORS.secondary} />
           </TouchableOpacity>
         ) : showLogo ? (
-          <BrandLogo size="md" onPress={() => navigation.navigate('HomeTab')} />
+          <BrandLogo size="md" onPress={() => navigation.navigate('Main', { screen: 'HomeTab' })} />
         ) : null}
       </View>
 
       {/* Center Slot: Title or Centered Logo */}
       <View style={styles.centerContainer}>
         {showLogo && showBack ? (
-          <BrandLogo size="sm" onPress={() => navigation.navigate('HomeTab')} />
+          <BrandLogo size="sm" onPress={() => navigation.navigate('Main', { screen: 'HomeTab' })} />
         ) : title ? (
           <View style={styles.titleWrapper}>
             <Text style={styles.title} numberOfLines={1}>
@@ -77,7 +79,7 @@ export const ScreenHeader = ({
             {showSearch && (
               <TouchableOpacity
                 style={styles.iconBtn}
-                onPress={() => navigation.navigate('ShopTab', { focusSearch: true })}
+                onPress={() => navigation.navigate('Main', { screen: 'ShopTab', params: { focusSearch: true } })}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Ionicons name="search-outline" size={22} color={COLORS.secondary} />
@@ -87,7 +89,7 @@ export const ScreenHeader = ({
             {showWishlist && (
               <TouchableOpacity
                 style={styles.iconBtn}
-                onPress={() => navigation.navigate('WishlistTab')}
+                onPress={() => navigation.navigate('Main', { screen: 'WishlistTab' })}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Ionicons name="heart-outline" size={22} color={COLORS.secondary} />
@@ -102,7 +104,7 @@ export const ScreenHeader = ({
             {showCart && (
               <TouchableOpacity
                 style={styles.iconBtn}
-                onPress={() => navigation.navigate('CartTab')}
+                onPress={() => navigation.navigate('Main', { screen: 'CartTab' })}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Ionicons name="bag-outline" size={22} color={COLORS.secondary} />

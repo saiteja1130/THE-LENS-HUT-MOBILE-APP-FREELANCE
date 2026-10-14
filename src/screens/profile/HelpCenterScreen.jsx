@@ -42,7 +42,7 @@ export const HelpCenterScreen = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.surface} />
-      <ScreenHeader title="Help Center & FAQs" />
+      <ScreenHeader title="Help Center & FAQs" showBack={true} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

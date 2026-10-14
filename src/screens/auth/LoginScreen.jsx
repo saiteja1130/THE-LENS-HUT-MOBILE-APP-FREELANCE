@@ -156,9 +156,12 @@ export const LoginScreen = ({ navigation }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
+        bounces={false}
       >
         <View style={styles.topSection}>
           <TouchableOpacity
@@ -367,12 +370,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.surface,
   },
+  scrollView: {
+    flex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 20,
-    paddingBottom: 32,
-    justifyContent: 'space-between',
+    paddingBottom: 40,
   },
   topSection: {
     marginBottom: 20,
@@ -447,8 +452,7 @@ const styles = StyleSheet.create({
     color: COLORS.error,
   },
   formSection: {
-    flex: 1,
-    justifyContent: 'center',
+    marginBottom: 20,
   },
   forgotPassword: {
     alignSelf: 'flex-end',
@@ -494,6 +498,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingTop: 24,
+    marginTop: 'auto',
   },
   footerText: {
     fontFamily: FONTS.family.regular,

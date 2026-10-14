@@ -68,7 +68,7 @@ export const EditProfileScreen = ({ navigation }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.surface} />
-      <ScreenHeader title="Edit Profile" />
+      <ScreenHeader title="Edit Profile" showBack={true} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

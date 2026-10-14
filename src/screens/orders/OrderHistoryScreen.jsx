@@ -138,7 +138,7 @@ export const OrderHistoryScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.surface} />
-      <ScreenHeader title="My Orders" />
+      <ScreenHeader title="My Orders" showBack={true} />
 
       <FlatList
         data={orders}
@@ -152,7 +152,7 @@ export const OrderHistoryScreen = ({ navigation }) => {
             title="No Orders Placed Yet"
             description="When you purchase eyeglasses or sunglasses from The Lens Hut, your orders will appear here."
             actionTitle="Start Shopping"
-            onActionPress={() => navigation.navigate('ShopTab')}
+            onActionPress={() => navigation.navigate('Main', { screen: 'ShopTab' })}
           />
         }
       />

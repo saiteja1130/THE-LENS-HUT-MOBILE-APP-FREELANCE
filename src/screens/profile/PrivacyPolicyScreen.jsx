@@ -9,7 +9,7 @@ export const PrivacyPolicyScreen = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.surface} />
-      <ScreenHeader title="Privacy Policy" />
+      <ScreenHeader title="Privacy Policy" showBack={true} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

@@ -9,6 +9,27 @@ export const FONTS = {
   black: 'Inter_18pt-Black',
   italic: 'Inter_18pt-Italic',
   boldItalic: 'Inter_18pt-BoldItalic',
+  family: {
+    thin: 'Inter_18pt-Thin',
+    extraLight: 'Inter_18pt-ExtraLight',
+    regular: 'Inter_18pt-Regular',
+    medium: 'Inter_18pt-Medium',
+    semiBold: 'Inter_18pt-SemiBold',
+    bold: 'Inter_18pt-Bold',
+    extraBold: 'Inter_18pt-ExtraBold',
+    black: 'Inter_18pt-Black',
+    italic: 'Inter_18pt-Italic',
+    boldItalic: 'Inter_18pt-BoldItalic',
+  },
+  size: {
+    xs: 12,
+    sm: 14,
+    md: 16,
+    lg: 18,
+    xl: 20,
+    xxl: 24,
+    xxxl: 30,
+  },
 };
 
 export const FONT_STYLES = {
