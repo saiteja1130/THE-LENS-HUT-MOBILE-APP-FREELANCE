@@ -2,11 +2,7 @@ import axios from 'axios';
 import { Platform } from 'react-native';
 import { storage, STORAGE_KEYS } from '../utils/storage';
 
-const BASE_URL = Platform.select({
-  android: 'http://10.0.2.2:5000/api/v1',
-  ios: 'http://localhost:5000/api/v1',
-  default: 'http://localhost:5000/api/v1',
-});
+const BASE_URL = 'https://the-lens-hut-backend-freelance.vercel.app/api/v1';
 
 const api = axios.create({
   baseURL: BASE_URL,
